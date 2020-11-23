@@ -10,6 +10,14 @@ Results for running above example, for p in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 
 
 ![cifar-100](https://github.com/edvinli/federated-learning-mixture/blob/main/figures/c_100(1).png)
 
+# Docker 
+
+To run this code in Docker, use the following.
+
+In subdirectory `docker` run `make debug` or in the root directory `docker run -it --rm -v `pwd`:/home/user/src martisak/fl-moe:latest bash`
+
+You can build this image in the `docker` directory with `make build`.
+
 # Cite
 If you find this work useful, please cite us using the following bibtex:
 ```bibtex
