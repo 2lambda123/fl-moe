@@ -19,8 +19,9 @@ def args_parser():
     parser.add_argument('--model', type=str, default='cnn', help='which model to use')
     parser.add_argument('--optim', type=str, default='sgd')
     parser.add_argument('--num_classes', type=int, default=10, help="number of classes")
-                        
+
     # other arguments
+    parser.add_argument('--filename', type=str, default='result', help='output filename')
     parser.add_argument('--dataset', type=str, default='mnist', help="name of dataset")
     parser.add_argument('--iid', action='store_true', help='whether i.i.d or not')
     parser.add_argument('--gpu', type=int, default=0, help="GPU ID, -1 for CPU")
