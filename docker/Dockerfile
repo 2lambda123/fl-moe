@@ -41,10 +41,12 @@ RUN curl -sLo ~/miniconda.sh https://repo.continuum.io/miniconda/Miniconda3-py38
 # CUDA 10.2-specific steps
 RUN conda install -y -c pytorch \
     cudatoolkit=10.2 \
-    matplotlib \
-    seaborn \
-    scikit-learn \
-    torchvision \
+    matplotlib=3.3.2 \
+    seaborn=0.11.0 \
+    scikit-learn=0.23.2 \
+    torchvision=0.8.1 \
+    colorlog=4.6.2 \
+    tabulate=0.8.7 \
  && conda clean -ya
 
 WORKDIR /home/user/src
