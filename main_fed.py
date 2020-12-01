@@ -16,9 +16,12 @@ from models.Models import MLP, CNNCifar, GateCNN, GateMLP, CNNFashion, GateCNNFa
 from models.FederatedAveraging import FedAvg
 from models.test_model import test_img, test_img_mix
 from sys import exit
+from utils.util import get_logger
 
 
 if __name__ == '__main__':
+
+    mylogger = get_logger("fl-moe")
 
     args = args_parser()
 
@@ -150,7 +153,7 @@ if __name__ == '__main__':
             opt_out = np.random.choice(range(args.num_clients), size=int(
                 args.opt * args.num_clients), replace=False)
             opt[opt_out] = 0.0
-            print(opt)
+            mylogger.debug(opt)
             for i in range(args.num_clients):
                 gates_e2e.append(GateMLP(dim_in=input_length,
                                          dim_hidden=200, dim_out=1).to(args.device))
@@ -160,7 +163,7 @@ if __name__ == '__main__':
         else:
             exit('error: no such model')
 
-        print(net_glob_fedAvg)
+        mylogger.debug(net_glob_fedAvg)
         for i in range(args.num_clients):
             gates_e2e[i].train()
             net_locals[i].train()
@@ -170,8 +173,9 @@ if __name__ == '__main__':
 
         acc_test_finetuned_avg = []
 
+        mylogger.info(f"Starting Federated Learning with {args.num_clients} clients for {args.epochs} rounds.")
         for iteration in range(args.epochs):
-            print('Round {:3d}'.format(iteration))
+            mylogger.info(f"Round {iteration}")
 
             w_fedAvg = []
             alpha = []
@@ -182,7 +186,7 @@ if __name__ == '__main__':
                 range(args.num_clients), m, replace=False)
 
             for idx in idxs_users:
-                print("FedAvg client %d" % (idx))
+                mylogger.debug(f"FedAvg client {idx}")
 
                 client = ClientUpdate(args=args,
                                       train_set=dataset_train,
@@ -215,6 +219,7 @@ if __name__ == '__main__':
         gate_values = []
         finetuned = []
 
+        mylogger.info("Starting finetuning")
         for idx in range(args.num_clients):
 
             client = ClientUpdate(args=args,
@@ -224,7 +229,7 @@ if __name__ == '__main__':
                                   idxs_val=dict_users_test[idx])
 
             # finetune FedAvg for every client
-            print("Finetune %d" % (idx))
+            mylogger.debug(f"Finetuning for client {idx}")
 
             wt, _, val_acc_finetuned, train_acc_finetuned = client.train_finetune(
                 net=copy.deepcopy(net_glob_fedAvg).to(args.device),
@@ -239,7 +244,8 @@ if __name__ == '__main__':
             finetuned.append(ft_net)
 
             # train local model
-            print("Local %d" % (idx))
+            # TODO: Remove magical constants
+            mylogger.debug(f"Training local model for client {idx}")
             w_l, _, val_acc_l, train_acc_l = client.train_finetune(
                 net=net_locals[idx].to(args.device),
                 n_epochs=200,
@@ -249,6 +255,7 @@ if __name__ == '__main__':
             val_acc_locals.append(val_acc_l)
             train_acc_locals.append(train_acc_l)
 
+        mylogger.info("Starting MoE trainings")
         for idx in range(args.num_clients):
 
             client = ClientUpdate(args=args,
@@ -257,7 +264,7 @@ if __name__ == '__main__':
                                   idxs_train=dict_users[idx],
                                   idxs_val=dict_users_test[idx])
 
-            print("E2e %d" % (idx))
+            mylogger.debug(f"Training mixtures for client {idx}")
 
             _, _, val_acc_e2e_k, _ = client.train_mix(
                 net_local=copy.deepcopy(net_locals[idx]).to(args.device),
@@ -312,3 +319,4 @@ if __name__ == '__main__':
                 val_acc_avg_rep, val_acc_avg_repft, acc_test_mix, acc_test_locals, acc_test_fedavg, ft_test_acc, ft_train_acc, train_acc_avg_locals,
                 val_acc_avg_gateonly, args.overlap, run))
             f1.write("\n")
+        mylogger.info("Done")
