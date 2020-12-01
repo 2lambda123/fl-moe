@@ -122,6 +122,27 @@ if __name__ == '__main__':
                 gates_e2e.append(copy.deepcopy(gates_e2e_model))
                 net_locals.append(copy.deepcopy(net_locals_model))
 
+        if (args.model == 'leaf') and (args.dataset in ['cifar10', 'cifar100']):
+            net_glob_fedAvg = CNNLeaf(args=args).to(args.device)
+            gates_e2e_model = GateCNN(args=args).to(args.device)
+            net_locals_model = CNNLeaf(args=args).to(args.device)
+
+            # opt-out fraction
+            opt = np.ones(args.num_clients)
+            opt_out = np.random.choice(
+                range(args.num_clients),
+                size=int(args.opt * args.num_clients),
+                replace=False)
+            opt[opt_out] = 0.0
+
+            gates_3 = []
+            gates_e2e = []
+            net_locals = []
+
+            for i in range(args.num_clients):
+                gates_e2e.append(copy.deepcopy(gates_e2e_model))
+                net_locals.append(copy.deepcopy(net_locals_model))
+
         elif (args.model == 'cnn') and (args.dataset in ['mnist', 'fashion-mnist']):
             net_glob_fedAvg = CNNFashion(args=args).to(args.device)
             gates_e2e_model = GateCNNFashion(args=args).to(args.device)
