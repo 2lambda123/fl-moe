@@ -249,7 +249,7 @@ if __name__ == '__main__':
             w_l, _, val_acc_l, train_acc_l = client.train_finetune(
                 net=net_locals[idx].to(args.device),
                 n_epochs=200,
-                learning_rate=1e-4)
+                learning_rate=args.lr)
 
             net_locals[idx].load_state_dict(w_l)
             val_acc_locals.append(val_acc_l)
@@ -273,7 +273,7 @@ if __name__ == '__main__':
                 train_gate_only=args.train_gate_only,
                 n_epochs=200,
                 early_stop=True,
-                learning_rate=1e-4)
+                learning_rate=args.lr)
 
             val_acc_e2e.append(val_acc_e2e_k)
 

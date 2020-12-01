@@ -9,7 +9,7 @@ def args_parser():
     parser.add_argument('--local_ep', type=int, default=5, help="the number of local epochs")
     parser.add_argument('--local_bs', type=int, default=10, help="local batch size")
     parser.add_argument('--bs', type=int, default=128, help="test batch size")
-    parser.add_argument('--lr', type=float, default=0.01, help="learning rate")
+    parser.add_argument('--lr', type=float, default=1e-4, help="learning rate")
     parser.add_argument('--momentum', type=float, default=0.5, help="SGD momentum (default: 0.5)")
     parser.add_argument('--n_data', type=float, default=500, help="datasize on each client")
     parser.add_argument('--train_frac', type=float, default=0.1, help="fraction of training data size")

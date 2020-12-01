@@ -26,6 +26,11 @@ class ClientUpdate(object):
         self.args = args
         self.loss_func = nn.NLLLoss()
         self.lr = 1e-5
+        if self.args.lr is not None:
+            self.lr = self.args.lr
+
+        #self.logger.debug(f"Learning rate: {self.lr}")
+
         self.selected_clients = []
         self.train_set = DatasetSplit(train_set,idxs_train)
         #dataset_length = len(self.train_val_set)
@@ -38,7 +43,7 @@ class ClientUpdate(object):
     def train(self, net, n_epochs):
         net.train()
         # train and update
-        optimizer = torch.optim.Adam(net.parameters(),lr=1e-4)
+        optimizer = torch.optim.Adam(net.parameters(), lr=self.lr)
 
         epoch_loss = []
 
@@ -64,8 +69,8 @@ class ClientUpdate(object):
     def train_finetune(self, net, n_epochs, learning_rate):
         net.train()
         # train and update
-        optimizer = torch.optim.Adam(net.parameters(),lr=learning_rate)
-        
+        optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
+
         patience = 10
         epoch_loss = []
         epoch_train_accuracy = []
@@ -118,9 +123,10 @@ class ClientUpdate(object):
         gate.train()
         
         if(train_gate_only):
-            optimizer = torch.optim.Adam(gate.parameters(),lr=learning_rate)
+            optimizer = torch.optim.Adam(gate.parameters(), lr=learning_rate)
         else:
-            optimizer = torch.optim.Adam(list(net_local.parameters()) + list(gate.parameters()) + list(net_global.parameters()),lr=learning_rate)
+            optimizer = torch.optim.Adam(list(net_local.parameters(
+            )) + list(gate.parameters()) + list(net_global.parameters()), lr=learning_rate)
 
         patience = 10
         epoch_loss = []
@@ -178,9 +184,10 @@ class ClientUpdate(object):
         gate.train()
         
         if(train_gate_only):
-            optimizer = torch.optim.Adam(gate.parameters(),lr=self.lr)
+            optimizer = torch.optim.Adam(gate.parameters(), lr=self.lr)
         else:
-            optimizer = torch.optim.Adam(list(net_local.parameters()) + list(gate.parameters()) + list(net_global.parameters()),lr=self.lr)
+            optimizer = torch.optim.Adam(list(net_local.parameters(
+            )) + list(gate.parameters()) + list(net_global.parameters()), lr=self.lr)
 
         patience = 10
         epoch_loss = []
@@ -241,8 +248,8 @@ class ClientUpdate(object):
         if(train_gate_only):
             optimizer = torch.optim.Adam(list(gate.parameters()), lr=self.lr)
         else:
-            optimizer = torch.optim.Adam(list(nets[0].parameters()) + list(nets[1].parameters()) + list(nets[2].parameters()) + list(gate.parameters()), lr=learning_rate)
-            
+            optimizer = torch.optim.Adam(list(nets[0].parameters()) + list(nets[1].parameters(
+            )) + list(nets[2].parameters()) + list(gate.parameters()), lr=learning_rate)
         patience = 10
         epoch_loss = []
         gate_best = gate.state_dict()
