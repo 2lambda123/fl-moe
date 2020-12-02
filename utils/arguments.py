@@ -22,7 +22,7 @@ def args_parser():
     parser.add_argument('--model', type=str, default='cnn', help='which model to use')
     parser.add_argument('--optim', type=str, default='sgd')
     parser.add_argument('--num_classes', type=int, default=10, help="number of classes")
-
+    parser.add_argument('--channels', type=int, default=3, help="number of channels")
     # other arguments
     parser.add_argument('--filename', type=str, default='result', help='output filename')
     parser.add_argument('--dataset', type=str, default='mnist', help="name of dataset")

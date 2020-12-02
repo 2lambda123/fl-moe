@@ -14,7 +14,8 @@
     "opt": 0 ,
     "p": 0.2 ,
     "gpu": 0 ,
-    "runs": 2,
-    "frac": 0.1
+    "runs": 10,
+    "frac": 0.1,
+    "channels": 3
 }
 
