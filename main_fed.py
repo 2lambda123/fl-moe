@@ -19,6 +19,14 @@ from sys import exit
 from utils.util import get_logger
 
 
+def weights_init(m):
+    if isinstance(m, torch.nn.Conv2d):
+        torch.nn.init.xavier_uniform_(m.weight)
+        #torch.nn.init.xavier_uniform(m.bias.data)
+    elif isinstance(m,torch.nn.Linear):
+        #torch.nn.init.xavier_uniform(m.weight)
+        m.bias.data.fill_(0.01)
+
 if __name__ == '__main__':
 
     mylogger = get_logger("fl-moe")
@@ -126,6 +134,10 @@ if __name__ == '__main__':
             net_glob_fedAvg = CNNLeaf(args=args).to(args.device)
             gates_e2e_model = GateCNN(args=args).to(args.device)
             net_locals_model = CNNLeaf(args=args).to(args.device)
+
+            net_glob_fedAvg.apply(weights_init)
+            gates_e2e_model.apply(weights_init)
+            net_locals_model.apply(weights_init)
 
             # opt-out fraction
             opt = np.ones(args.num_clients)
