@@ -22,9 +22,12 @@ class DatasetSplit(Dataset):
 
 
 class ClientUpdate(object):
-    def __init__(self, args, train_set=None,  val_set=None, idxs_train=None, idxs_val=None):
+    def __init__(self, args, train_set=None, val_set=None, idxs_train=None, idxs_val=None):
+
+        self.logger = get_logger("ClientUpdate")
         self.args = args
         self.loss_func = nn.NLLLoss()
+
         self.lr = 1e-5
         if self.args.lr is not None:
             self.lr = self.args.lr
