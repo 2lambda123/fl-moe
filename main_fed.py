@@ -12,12 +12,14 @@ import torch
 from utils.sample_data import mnist_iid, mnist_iid2, mnist_noniid2, cifar_iid, cifar_iid2, cifar_noniid, cifar_noniid2
 from utils.arguments import args_parser
 from models.ClientUpdate import ClientUpdate
-from models.Models import MLP, CNNCifar, GateCNN, GateMLP, CNNFashion, GateCNNFashion, GateCNNSoftmax, MLP2, CNNLeaf
+from models.Models import MLP, CNNCifar, GateCNN, GateMLP, CNNFashion, GateCNNFashion, GateCNNSoftmax, MLP2, CNNLeaf, CNNLeafFEMNIST
 from models.FederatedAveraging import FedAvg
 from models.test_model import test_img, test_img_mix
 from sys import exit
 from utils.util import get_logger
 
+def rename_keys(d):
+   return {n:v for n, (k,v) in enumerate(d.items())}
 
 def weights_init(m):
     if isinstance(m, torch.nn.Conv2d):
@@ -147,10 +149,36 @@ if __name__ == '__main__':
                 gates_e2e.append(copy.deepcopy(gates_e2e_model))
                 net_locals.append(copy.deepcopy(net_locals_model))
 
-        if (args.model == 'leaf') and (args.dataset in ['cifar10', 'cifar100', 'femnist']):
+        elif (args.model == 'leaf') and (args.dataset in ['cifar10', 'cifar100']):
             net_glob_fedAvg = CNNLeaf(args=args).to(args.device)
             gates_e2e_model = GateCNN(args=args).to(args.device)
             net_locals_model = CNNLeaf(args=args).to(args.device)
+
+            net_glob_fedAvg.apply(weights_init)
+            gates_e2e_model.apply(weights_init)
+            net_locals_model.apply(weights_init)
+
+            # opt-out fraction
+            opt = np.ones(args.num_clients)
+            opt_out = np.random.choice(
+                range(args.num_clients),
+                size=int(args.opt * args.num_clients),
+                replace=False)
+            opt[opt_out] = 0.0
+
+            gates_3 = []
+            gates_e2e = []
+            net_locals = []
+
+            for i in range(args.num_clients):
+                gates_e2e.append(copy.deepcopy(gates_e2e_model))
+                net_locals.append(copy.deepcopy(net_locals_model))
+
+        elif (args.model == 'leaf') and (args.dataset in ['femnist']):
+
+            net_glob_fedAvg = CNNLeafFEMNIST(args=args).to(args.device)
+            gates_e2e_model = GateCNNFashion(args=args).to(args.device)
+            net_locals_model = CNNLeafFEMNIST(args=args).to(args.device)
 
             net_glob_fedAvg.apply(weights_init)
             gates_e2e_model.apply(weights_init)
