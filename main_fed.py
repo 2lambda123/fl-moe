@@ -61,6 +61,23 @@ if __name__ == '__main__':
                 dict_users = mnist_noniid2(
                     dataset_train, args.num_clients, args.p)
 
+        elif args.dataset == "femnist":
+
+            from FemnistDataset import FemnistDataset
+
+            # TODO: add transform
+            #trans_femnist = transforms.Compose(
+            #    [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+
+            root_dir = "/proj/second-carrier-prediction/leaf/data/femnist/data/"
+            dataset_train = FemnistDataset(root_dir=root_dir, train=True)
+            dataset_test = FemnistDataset(root_dir=root_dir, train=False)
+
+            # TODO: Add user sampling for the population
+            dict_users = rename_keys(dataset_train.dict_users)
+            dict_users_test = rename_keys(dataset_test.dict_users)
+
+
         elif args.dataset == 'cifar10':
             trans_cifar = transforms.Compose(
                 [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -130,7 +147,7 @@ if __name__ == '__main__':
                 gates_e2e.append(copy.deepcopy(gates_e2e_model))
                 net_locals.append(copy.deepcopy(net_locals_model))
 
-        if (args.model == 'leaf') and (args.dataset in ['cifar10', 'cifar100']):
+        if (args.model == 'leaf') and (args.dataset in ['cifar10', 'cifar100', 'femnist']):
             net_glob_fedAvg = CNNLeaf(args=args).to(args.device)
             gates_e2e_model = GateCNN(args=args).to(args.device)
             net_locals_model = CNNLeaf(args=args).to(args.device)
