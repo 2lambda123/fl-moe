@@ -272,15 +272,26 @@ if __name__ == '__main__':
                                       idxs_train=dict_users[idx],
                                       idxs_val=dict_users_test[idx])
 
+                # TODO: Affects C
                 if(opt[idx]):
                     # train FedAvg
-                    w_glob_fedAvg, _ = client.train(net=copy.deepcopy(
+                    w_glob_fedAvg, train_loss_fed = client.train(net=copy.deepcopy(
                         net_glob_fedAvg).to(args.device), n_epochs=args.local_ep)
 
                     w_fedAvg.append(copy.deepcopy(w_glob_fedAvg))
 
                     # Weigh models by client dataset size
                     alpha.append(len(dict_users[idx]) / len(dataset_train))
+
+                val_acc_fed, val_loss_fed = client.validate(
+                    net=net_glob_fedAvg.to(args. device))
+
+                # TODO: Add training accuracy
+                with open('save/training' + filename, 'a') as f1:
+                    f1.write(f"{iteration};{idx};{train_loss_fed};{val_acc_fed};{val_loss_fed}")
+                    f1.write("\n")
+
+                # mylogger.debug(f"FL-training;{idx};{train_loss_fed};{val_acc_fed}{val_loss_fed}")
 
             # update global model weights
             w_glob_fedAvg = FedAvg(w_fedAvg, alpha)
