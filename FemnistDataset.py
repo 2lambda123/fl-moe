@@ -19,7 +19,7 @@ class FemnistDataset(Dataset):
 
         self.width = 28
         self.data = torch.tensor([])
-        self.targets = torch.tensor([])
+        self.targets = torch.LongTensor([])
 
         self.clients = []
         self.groups = []
@@ -54,9 +54,10 @@ class FemnistDataset(Dataset):
                      torch.reshape(torch.tensor(data['x']), (-1,  self.width,  self.width))))
 
                 # Extend the target tensor
+                user_targets = torch.LongTensor(data['y'])
                 self.targets = torch.cat(
                     (self.targets,
-                     torch.tensor(data['y'])))
+                     user_targets))
 
                 # Check if this user already exists in the dictionary
                 if user in self.dict_users:
