@@ -13,14 +13,15 @@ class MLP(nn.Module):
         self.activation = nn.LogSoftmax()
 
     def forward(self, x):
-        x = x.view(-1, x.shape[1]*x.shape[-2]*x.shape[-1])
+        x = x.view(-1, x.shape[1] * x.shape[-2] * x.shape[-1])
         x = self.layer_input(x)
         x = self.dropout(x)
         x = self.relu(x)
         x = self.layer_hidden(x)
         x = self.activation(x)
         return x
-    
+
+
 class MLP2(nn.Module):
     def __init__(self, dim_in, dim_hidden, dim_out):
         super(MLP2, self).__init__()
@@ -37,7 +38,8 @@ class MLP2(nn.Module):
         x = self.layer_hidden(x)
         x = self.activation(x)
         return x
-    
+
+
 class GateMLP(nn.Module):
     def __init__(self, dim_in, dim_hidden, dim_out):
         super(GateMLP, self).__init__()
@@ -48,7 +50,7 @@ class GateMLP(nn.Module):
         self.activation = nn.Sigmoid()
 
     def forward(self, x):
-        x = x.view(-1, x.shape[1]*x.shape[-2]*x.shape[-1])
+        x = x.view(-1, x.shape[1] * x.shape[-2] * x.shape[-1])
         x = self.layer_input(x)
         x = self.dropout(x)
         x = self.relu(x)
@@ -113,7 +115,8 @@ class CNNCifar(nn.Module):
         x = self.fc3(out1)
         out2 = self.activation(x)
         return out1, out2
-    
+
+
 class GateCNN(nn.Module):
     def __init__(self, args):
         super(GateCNN, self).__init__()
@@ -137,7 +140,8 @@ class GateCNN(nn.Module):
         x = self.fc3(x)
         x = self.activation(x)
         return x
-    
+
+
 class GateCNNSoftmax(nn.Module):
     def __init__(self, args):
         super(GateCNNSoftmax, self).__init__()
@@ -159,7 +163,8 @@ class GateCNNSoftmax(nn.Module):
         x = self.fc3(x)
         x = self.activation(x)
         return x
-    
+
+
 class CNNFashion(nn.Module):
     def __init__(self, args):
         super(CNNFashion, self).__init__()
@@ -184,7 +189,7 @@ class CNNFashion(nn.Module):
         out2 = self.activation(x)
         return out1, out2
 
-    
+
 class GateCNNFashion(nn.Module):
     def __init__(self, args):
         super(GateCNNFashion, self).__init__()
@@ -208,7 +213,8 @@ class GateCNNFashion(nn.Module):
         x = self.fc3(x)
         x = self.activation(x)
         return x
-    
+
+
 class GateCNNFahsionSoftmax(nn.Module):
     def __init__(self, args):
         super(GateCNNSoftmax, self).__init__()

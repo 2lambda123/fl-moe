@@ -61,7 +61,7 @@ def mnist_noniid(dataset, num_users,p):
         idx_shard = list(set(idx_shard) - rand_set)
         for rand in rand_set:
             dict_users[i] = np.concatenate((dict_users[i], idxs[rand*num_imgs:(rand+1)*num_imgs]), axis=0)
-     
+
     print(len(dict_users[0]))
     return dict_users
 
@@ -69,18 +69,18 @@ def mnist_noniid2(dataset, num_users, p):
     #n_data = int(len(dataset)/num_users) #data per client
     #n_data = 500
     n_data = 300
-    
+
     idxs = np.arange(len(dataset),dtype=int)
     labels = dataset.train_labels.numpy()
     label_list = np.unique(labels)
-    
+
     # sort labels
     idxs_labels = np.vstack((idxs, labels))
     idxs_labels = idxs_labels[:,idxs_labels[1,:].argsort()]
     #print(idxs_labels)
     idxs = idxs_labels[0,:]
     idxs = idxs.astype(int)
-    
+
     dict_users = {i: np.array([], dtype='int64') for i in range(num_users)}
 
     #Sample majority class for each user
@@ -93,7 +93,7 @@ def mnist_noniid2(dataset, num_users, p):
 
         majority_label_idxs = (majority_labels[0] == labels[idxs]) | (majority_labels[1] == labels[idxs])
         sub_data_idxs = np.random.choice(idxs[majority_label_idxs], int(p*n_data), replace = False)
-        
+
         dict_users[i] = np.concatenate((dict_users[i], sub_data_idxs))
         idxs = np.array(list(set(idxs) - set(sub_data_idxs)))
 
@@ -190,27 +190,27 @@ def cifar_noniid2(dataset,dataset_test, num_users, p, n_data, n_data_test, overl
     idxs = np.arange(len(dataset),dtype=int)
     labels = np.array(dataset.targets)
     label_list = np.unique(dataset.targets)
-    
+
     # sort labels
     idxs_labels = np.vstack((idxs, labels))
     idxs_labels = idxs_labels[:,idxs_labels[1,:].argsort()]
     #print(idxs_labels)
     idxs = idxs_labels[0,:]
     idxs = idxs.astype(int)
-    
+
     dict_users = {i: np.array([], dtype='int64') for i in range(num_users)}
-    
+
     idxs_test = np.arange(len(dataset_test),dtype=int)
     labels_test = np.array(dataset_test.targets)
     label_list_test = np.unique(dataset_test.targets)
-    
+
     # sort labels
     idxs_labels_test = np.vstack((idxs_test, labels_test))
     idxs_labels_test = idxs_labels_test[:,idxs_labels_test[1,:].argsort()]
     #print(idxs_labels)
     idxs_test = idxs_labels_test[0,:]
     idxs_test = idxs_test.astype(int)
-    
+
     dict_users_test = {i: np.array([], dtype='int64') for i in range(num_users)}
 
     num_classes = len(label_list)
@@ -232,7 +232,7 @@ def cifar_noniid2(dataset,dataset_test, num_users, p, n_data, n_data_test, overl
         label2 = majority_labels[1]
         majority_labels = np.array([label1, label2])
         user_majority_labels.append(majority_labels)
-        
+
         majority_labels1_idxs = idxs[majority_labels[0] == labels[idxs]]
         majority_labels2_idxs = idxs[majority_labels[1] == labels[idxs]]
 
@@ -244,8 +244,8 @@ def cifar_noniid2(dataset,dataset_test, num_users, p, n_data, n_data_test, overl
 
         idxs = np.array(list(set(idxs) - set(sub_data_idxs1)))
         idxs = np.array(list(set(idxs) - set(sub_data_idxs2)))
-        
-        
+
+
         majority_labels1_idxs_test = idxs_test[majority_labels[0] == labels_test[idxs_test]]
         majority_labels2_idxs_test = idxs_test[majority_labels[1] == labels_test[idxs_test]]
 
@@ -254,10 +254,10 @@ def cifar_noniid2(dataset,dataset_test, num_users, p, n_data, n_data_test, overl
 
         dict_users_test[i] = np.concatenate((dict_users_test[i], sub_data_idxs1_test))
         dict_users_test[i] = np.concatenate((dict_users_test[i], sub_data_idxs2_test))
-        
+
         idxs_test = np.array(list(set(idxs_test) - set(sub_data_idxs1_test)))
         idxs_test = np.array(list(set(idxs_test) - set(sub_data_idxs2_test)))
-        
+
     if p<1.0:
         for i in range(num_users):
             if(len(idxs)>=n_data):
@@ -266,12 +266,12 @@ def cifar_noniid2(dataset,dataset_test, num_users, p, n_data, n_data_test, overl
                 sub_data_idxs11 = np.random.choice(non_majority_labels1_idxs, int((1-p)*n_data), replace = False)
                 dict_users[i] = np.concatenate((dict_users[i], sub_data_idxs11))
                 idxs = np.array(list(set(idxs) - set(sub_data_idxs11)))
-                
+
                 non_majority_labels1_idxs_test = idxs_test[(majority_labels[0] != labels_test[idxs_test]) & (majority_labels[1] != labels_test[idxs_test])]
                 sub_data_idxs11_test = np.random.choice(non_majority_labels1_idxs_test, int((1-p)*n_data_test), replace = False)
                 dict_users_test[i] = np.concatenate((dict_users_test[i], sub_data_idxs11_test))
                 idxs_test = np.array(list(set(idxs_test) - set(sub_data_idxs11_test)))
-                
+
             else:
                 dict_users[i] = np.concatenate((dict_users[i], idxs))
                 dict_users_test[i] = np.concatenate((dict_users_test[i], idxs_test))
