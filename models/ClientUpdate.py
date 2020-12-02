@@ -1,12 +1,12 @@
+"""
+Client Update
+"""
+
 import torch
-from torch import nn, autograd
+from torch import nn
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
-import random
-from sklearn import metrics
-from torch import nn
-import torch.nn.functional as F
-
+from utils.util import get_logger
 
 class DatasetSplit(Dataset):
     def __init__(self, dataset, idxs):
