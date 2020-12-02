@@ -9,13 +9,16 @@ def args_parser():
     parser.add_argument('--local_ep', type=int, default=5, help="the number of local epochs")
     parser.add_argument('--local_bs', type=int, default=10, help="local batch size")
     parser.add_argument('--bs', type=int, default=128, help="test batch size")
-    parser.add_argument('--lr', type=float, default=1e-4, help="learning rate")
+    parser.add_argument('--lr', type=float, default=1e-4, help="FL learning rate")
+    parser.add_argument('--ft_lr', type=float, default=1e-4, help="fine tuning learning rate")
+    parser.add_argument('--moe_lr', type=float, default=1e-4, help="mixture of experts learning rate")
+    parser.add_argument('--local_lr', type=float, default=1e-4, help="mixture of experts learning rate")
     parser.add_argument('--momentum', type=float, default=0.5, help="SGD momentum (default: 0.5)")
     parser.add_argument('--n_data', type=float, default=500, help="datasize on each client")
     parser.add_argument('--train_frac', type=float, default=0.1, help="fraction of training data size")
     parser.add_argument('--n_data_test',type=float,default=100,help="test datasize on each client")
     parser.add_argument('--overlap', action='store_true', help='whether to allow label overlap between clients or not')
-    # model arguments
+    # model argumentsiter
     parser.add_argument('--model', type=str, default='cnn', help='which model to use')
     parser.add_argument('--optim', type=str, default='sgd')
     parser.add_argument('--num_classes', type=int, default=10, help="number of classes")

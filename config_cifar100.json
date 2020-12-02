@@ -1,8 +1,11 @@
 {
     "model": "leaf",
     "dataset": "cifar100",
-    "n_data": 100,
-    "lr": 1e-5,
+    "n_data": 500,
+    "lr": 1e-7,
+    "ft_lr": 1e-7,
+    "local_lr": 1e-4,
+    "moe_lr": 1e-4,
     "num_clients": 50,
     "num_classes": 100,
     "epochs": 1500,

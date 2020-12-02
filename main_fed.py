@@ -252,10 +252,11 @@ if __name__ == '__main__':
             # finetune FedAvg for every client
             mylogger.debug(f"Finetuning for client {idx}")
 
+            # TODO: Remove magical constants
             wt, _, val_acc_finetuned, train_acc_finetuned = client.train_finetune(
                 net=copy.deepcopy(net_glob_fedAvg).to(args.device),
                 n_epochs=200,
-                learning_rate=1e-4)
+                learning_rate=args.ft_lr)
 
             val_acc_ft.append(val_acc_finetuned)
             train_acc_ft.append(train_acc_finetuned)
@@ -270,7 +271,7 @@ if __name__ == '__main__':
             w_l, _, val_acc_l, train_acc_l = client.train_finetune(
                 net=net_locals[idx].to(args.device),
                 n_epochs=200,
-                learning_rate=args.lr)
+                learning_rate=args.local_lr)
 
             net_locals[idx].load_state_dict(w_l)
             val_acc_locals.append(val_acc_l)
@@ -294,7 +295,7 @@ if __name__ == '__main__':
                 train_gate_only=args.train_gate_only,
                 n_epochs=200,
                 early_stop=True,
-                learning_rate=args.lr)
+                learning_rate=args.moe_lr)
 
             val_acc_e2e.append(val_acc_e2e_k)
 
