@@ -62,19 +62,20 @@ class GateMLP(nn.Module):
 class CNNLeaf(nn.Module):
     """
     Model from LEAF paper, but with dropout
+    TODO: Implicit dimension choice for log_softmax has been deprecated
     """
 
     def __init__(self, args):
 
         super().__init__()
 
-        self.conv1 = nn.Conv2d(3, 32, 5)
+        self.conv1 = nn.Conv2d(args.channels, 32, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(32, 64, 5)
         self.fc1 = nn.Linear(64 * 5 * 5, 512)
         self.dropout = nn.Dropout()
         self.fc2 = nn.Linear(512, args.num_classes)
-        self.activation = nn.LogSoftmax()
+        self.activation = nn.LogSoftmax(dim=args.num_classes)
 
     def forward(self, x):
         """

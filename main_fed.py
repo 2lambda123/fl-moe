@@ -12,7 +12,7 @@ import torch
 from utils.sample_data import mnist_iid, mnist_iid2, mnist_noniid2, cifar_iid, cifar_iid2, cifar_noniid, cifar_noniid2
 from utils.arguments import args_parser
 from models.ClientUpdate import ClientUpdate
-from models.Models import MLP, CNNCifar, GateCNN, GateMLP, CNNFashion, GateCNNFashion, GateCNNSoftmax, MLP2
+from models.Models import MLP, CNNCifar, GateCNN, GateMLP, CNNFashion, GateCNNFashion, GateCNNSoftmax, MLP2, CNNLeaf
 from models.FederatedAveraging import FedAvg
 from models.test_model import test_img, test_img_mix
 from sys import exit
