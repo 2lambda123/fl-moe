@@ -22,7 +22,7 @@ You can also specify a configuration file and iterate over a parameter by runnin
 python iterator.py --filename config_femnist.json
 ```
 
-Note that for the FEMNIST dataset, you will have to generate the data by running the preprocessing script in the `leaf/data/femnist` subfolder. See [https://github.com/TalwalkarLab/leaf/tree/master/data/femnist](FEMNIST Dataset)
+Note that for the FEMNIST dataset, you will have to generate the data by running the preprocessing script in the `leaf/data/femnist` subfolder. See [FEMNIST dataset](https://github.com/TalwalkarLab/leaf/tree/master/data/femnist)
 for more information on this script.
 
 # Results
