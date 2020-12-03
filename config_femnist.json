@@ -7,7 +7,7 @@
     "local_lr": 1e-4,
     "moe_lr": 1e-4,
     "num_clients": 190,
-    "num_classes": 63,
+    "num_classes": 62,
     "epochs": 100,
     "train_frac": 0.2,
     "local_ep": 3 ,
