@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
             f1.write('\n')
 
-
+    # TODO: print warnings if arguments are not used (p, overlap)
     for run in range(args.runs):
 
         args.device = torch.device('cuda:{}'.format(args.gpu))
@@ -53,9 +53,11 @@ if __name__ == '__main__':
             trans_mnist = transforms.Compose(
                 [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
             dataset_train = datasets.MNIST(
-                '../data/mnist/', train=True, download=True, transform=trans_mnist)
+                '../data/mnist/', train=True,
+                download=True, transform=trans_mnist)
             dataset_test = datasets.MNIST(
-                '../data/mnist/', train=False, download=True, transform=trans_mnist)
+                '../data/mnist/', train=False,
+                download=True, transform=trans_mnist)
 
             if args.iid:
                 dict_users = mnist_iid(dataset_train, args.num_clients)
@@ -84,9 +86,11 @@ if __name__ == '__main__':
             trans_cifar = transforms.Compose(
                 [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
             dataset_train = datasets.CIFAR10(
-                '../data/cifar', train=True, download=True, transform=trans_cifar)
+                '../data/cifar', train=True,
+                download=True, transform=trans_cifar)
             dataset_test = datasets.CIFAR10(
-                '../data/cifar', train=False, download=True, transform=trans_cifar)
+                '../data/cifar', train=False,
+                download=True, transform=trans_cifar)
 
             if args.iid:
                 dict_users = cifar_iid(
@@ -126,12 +130,15 @@ if __name__ == '__main__':
             exit('error: dataset not available')
 
         img_size = dataset_train[0][0].shape
+        mylogger.info(f"Sample size: {img_size}")
 
         input_length = 1
         for x in img_size:
             input_length *= x
 
+        # Models
         if (args.model == 'cnn') and (args.dataset in ['cifar10', 'cifar100']):
+
             net_glob_fedAvg = CNNCifar(args=args).to(args.device)
             gates_e2e_model = GateCNN(args=args).to(args.device)
             net_locals_model = CNNCifar(args=args).to(args.device)
@@ -252,12 +259,14 @@ if __name__ == '__main__':
         acc_test_finetuned_avg = []
 
         mylogger.info(f"Starting Federated Learning with {args.num_clients} clients for {args.epochs} rounds.")
+
         for iteration in range(args.epochs):
             mylogger.info(f"Round {iteration}")
 
             w_fedAvg = []
             alpha = []
 
+            # TODO: Fix, should be max(1,ceil(C*n))
             m = max(int(args.frac * args.num_clients), 1)
 
             idxs_users = np.random.choice(
