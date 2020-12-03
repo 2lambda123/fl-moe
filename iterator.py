@@ -27,7 +27,7 @@ if __name__ == "__main__":
     for filename in args.filename:
         config = read_config(filename)
 
-        pvals = np.logspace(-1,-10,10)
+        pvals = np.logspace(-6,-2, 20)
         mylogger.info(f"Starting experiment from {filename} with lr={pvals}")
 
         child_processes = []
@@ -36,16 +36,20 @@ if __name__ == "__main__":
         for n, p in enumerate(pvals):
 
             config["lr"] = p
+            config["ft_lr"] = p
+            config["local_lr"] = p
+            config["moe_lr"] = p
+
             config["gpu"] = n % 8
             dataset = config["dataset"]
-            config["filename"] = f"results_{dataset}_p_{p}.csv"
+            config["filename"] = f"results_{dataset}_lr_{p}.csv"
 
             command = ["python", "main_fed.py"]
 
             for k, v in config.items():
                 command.extend([f"--{k}", str(v)])
 
-            #command.extend(["--overlap"])
+            # command.extend(["--overlap"])
             mylogger.debug(command)
 
             # Allow dry-runs
