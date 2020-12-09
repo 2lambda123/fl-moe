@@ -3,6 +3,24 @@ from torch import nn
 import torch.nn.functional as F
 
 
+class MyEnsemble(nn.Module):
+    def __init__(self, modelA, modelB):
+        super().__init__()
+        self.modelA = modelA
+        self.modelB = modelB
+        # self.classifier = nn.Linear(noClasses * 2, noClasses)
+        self.activation = nn.LogSoftmax()
+
+    def forward(self, x):
+        with torch.no_grad():
+            x1, _ = self.modelA(x)
+            x2, _ = self.modelB(x)
+        #x = torch.cat((x1, x2), dim=1)
+        #x = self.classifier(F.relu(x))
+        out = self.activation(x1 + x2)
+        return 0, out
+
+
 class MLP(nn.Module):
     def __init__(self, dim_in, dim_hidden, dim_out):
         super(MLP, self).__init__()
