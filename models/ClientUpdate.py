@@ -44,17 +44,19 @@ class ClientUpdate(object):
         self.val_set = DatasetSplit(val_set, idxs_val)
         self.ldr_val = DataLoader(self.val_set, batch_size=1, shuffle=True)
 
-    def train(self, net, n_epochs):
+
+    def train(self, net, n_epochs, validate=False):
         net.train()
         # train and update
+        # TODO: Why does Adam work?
         optimizer = torch.optim.Adam(net.parameters(), lr=self.lr)
 
-        epoch_loss = []
+        epoch_loss = np.inf
 
-        for iter in range(n_epochs):
+        for _ in range(n_epochs):
             net.train()
             batch_loss = []
-            for batch_idx, (images, labels) in enumerate(self.ldr_train):
+            for _, (images, labels) in enumerate(self.ldr_train):
                 images, labels = images.to(
                     self.args.device), labels.to(self.args.device)
                 net.zero_grad()
@@ -64,12 +66,14 @@ class ClientUpdate(object):
                 loss.backward()
                 optimizer.step()
                 batch_loss.append(loss.item())
-            epoch_loss.append(sum(batch_loss) / len(batch_loss))
+            epoch_loss = sum(batch_loss) / len(batch_loss)
 
-            #val_acc, val_loss = self.validate(net)
+            if validate:
+                val_acc, val_loss = self.validate(net)
+                return net.state_dict(), epoch_loss, val_acc, val_loss
             # print(val_acc)
 
-        return net.state_dict(), epoch_loss[-1]
+        return net.state_dict(), epoch_loss
 
     def train_finetune(self, net, n_epochs, learning_rate):
         net.train()
@@ -121,7 +125,13 @@ class ClientUpdate(object):
 
         return model_best, epoch_loss[-1], val_acc_best, train_acc_best
 
+
+
     def train_mix(self, net_local, net_global, gate, train_gate_only, n_epochs, early_stop, learning_rate):
+        """
+        TODO: Add training accuracy
+        """
+
         net_local.train()
         net_global.train()
         gate.train()
@@ -154,11 +164,15 @@ class ClientUpdate(object):
                 net_global.zero_grad()
                 gate.zero_grad()
 
+                # TODO: Log gate weights
                 gate_weight = gate(images)
                 _, local_probs = net_local(images)
                 _, global_probs = net_global(images)
+
+                # TODO: update loss function
                 log_probs = gate_weight * local_probs + \
                     (1 - gate_weight) * global_probs
+
                 loss = self.loss_func(log_probs, labels)
                 loss.backward()
                 optimizer.step()
@@ -350,6 +364,8 @@ class ClientUpdate(object):
             for idx, (data, target) in enumerate(self.ldr_val):
                 data, target = data.to(
                     self.args.device), target.to(self.args.device)
+
+                # TODO: Log gate weights
                 gate_weight = gate(data)
 
                 gate_values = np.append(gate_values, gate_weight.item())
