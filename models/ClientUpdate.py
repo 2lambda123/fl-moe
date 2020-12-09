@@ -112,7 +112,7 @@ class ClientUpdate(object):
                     val_acc_best = val_acc
                     val_loss_best = val_loss
                     train_acc_best = train_accuracy
-                    print("Iter %d | %.2f" % (iter, val_acc_best))
+                    self.logger.debug(f"Finetuning Iter {iter} | {val_acc_best:.2f}")
                 else:
                     counter = counter + 1
 
@@ -176,7 +176,7 @@ class ClientUpdate(object):
                         val_acc_best = val_acc
                         val_loss_best = val_loss
                         gate_values_best = gate_values
-                        print("Iter %d | %.2f" % (iter, val_acc_best))
+                        self.logger.debug(f"MoE Iter {iter} | {val_acc_best:.2f}")
                     else:
                         counter = counter + 1
 
