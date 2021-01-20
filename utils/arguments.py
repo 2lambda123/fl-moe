@@ -6,7 +6,7 @@ def args_parser():
     parser.add_argument('--epochs', type=int, default=10, help="global epochs")
     parser.add_argument('--num_clients', type=int, default=100, help="number of clients")
     parser.add_argument('--frac', type=float, default=0.1, help="the fraction of clients")
-    parser.add_argument('--local_ep', type=int, default=5, help="the number of local epochs")
+    parser.add_argument('--local_ep', type=int, default=5, help="the number of local epochs for FL")
     parser.add_argument('--local_bs', type=int, default=10, help="local batch size")
     parser.add_argument('--bs', type=int, default=128, help="test batch size")
     parser.add_argument('--lr', type=float, default=1e-4, help="FL learning rate")
@@ -14,6 +14,7 @@ def args_parser():
     parser.add_argument('--moe_lr', type=float, default=1e-4, help="mixture of experts learning rate")
     parser.add_argument('--local_lr', type=float, default=1e-4, help="mixture of experts learning rate")
     parser.add_argument('--momentum', type=float, default=0.5, help="SGD momentum (default: 0.5)")
+    parser.add_argument('--eps', type=float, default=0.1, help="Epsilon")
     parser.add_argument('--n_data', type=float, default=500, help="datasize on each client")
     parser.add_argument('--train_frac', type=float, default=0.1, help="fraction of training data size")
     parser.add_argument('--n_data_test',type=float,default=100,help="test datasize on each client")
@@ -24,7 +25,7 @@ def args_parser():
     parser.add_argument('--num_classes', type=int, default=10, help="number of classes")
     parser.add_argument('--channels', type=int, default=3, help="number of channels")
     # other arguments
-    parser.add_argument('--filename', type=str, default='result', help='output filename')
+    parser.add_argument('--clusters', type=int, default=1, help="Number of clusters")
     parser.add_argument('--dataset', type=str, default='mnist', help="name of dataset")
     parser.add_argument('--iid', action='store_true', help='whether i.i.d or not')
     parser.add_argument('--gpu', type=int, default=0, help="GPU ID, -1 for CPU")
@@ -34,5 +35,16 @@ def args_parser():
     parser.add_argument('--opt', type=float, default=0.5, help='fraction of clients that opt-in (default: 0.5)')
     parser.add_argument('--p', type=float, default = 0.3, help='majority class percentage (default: 0.3)')
     parser.add_argument('--train_gate_only', action='store_true', help='whether to train gate only or not')
+    parser.add_argument('--finetuning', action='store_true', help='whether to train finetuned models or not')
+    parser.add_argument('--ensembles', action='store_true', help='whether to train ensemble models or not')
+    parser.add_argument('--tensorboard', action='store_true', help='output tensorboard logs')
+
+    # TODO: Rename
+    parser.add_argument('--loc_epochs', type=int, default=200, help="number of iterations for local and MOE training")
+
+    # output arguments
+    parser.add_argument('--filename', type=str, default='result', help='output filename')
+    parser.add_argument('--experiment', type=str, default='result', help='output path')
+
     args = parser.parse_args()
     return args

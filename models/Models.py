@@ -4,21 +4,24 @@ import torch.nn.functional as F
 
 
 class MyEnsemble(nn.Module):
-    def __init__(self, modelA, modelB):
+    """
+    Variable size Ensemble model
+    """
+
+    def __init__(self, models):
         super().__init__()
-        self.modelA = modelA
-        self.modelB = modelB
-        # self.classifier = nn.Linear(noClasses * 2, noClasses)
+        self.models = models
         self.activation = nn.LogSoftmax()
 
     def forward(self, x):
+        """
+        Forward pass
+        """
+
         with torch.no_grad():
-            x1, _ = self.modelA(x)
-            x2, _ = self.modelB(x)
-        #x = torch.cat((x1, x2), dim=1)
-        #x = self.classifier(F.relu(x))
-        out = self.activation(x1 + x2)
-        return 0, out
+            out_list = torch.stack([model(x)[0] for model in self.models])
+
+        return 0, self.activation(torch.sum(out_list, axis=0))
 
 
 class MLP(nn.Module):
@@ -111,16 +114,22 @@ class CNNLeafFEMNIST(nn.Module):
 
 class GateCNNLeaf(nn.Module):
 
-    def __init__(self):
+    def __init__(self, args):
         super().__init__()
 
+        self.nomodels = args.clusters + 1
         self.conv1 = nn.Conv2d(3, 32, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(32, 64, 5)
         self.fc1 = nn.Linear(64 * 5 * 5, 512)
         self.dropout = nn.Dropout()
-        self.fc2 = nn.Linear(512, 1)
-        self.activation = nn.Sigmoid()
+
+        if self.nomodels <= 2:
+            self.fc2 = nn.Linear(512, 1)
+            self.activation = nn.Sigmoid()
+        else:
+            self.fc2 = nn.Linear(512, self.nomodels)
+            self.activation = nn.Softmax()
 
     def forward(self, x):
 
@@ -135,16 +144,22 @@ class GateCNNLeaf(nn.Module):
 
 class GateCNNFEMNIST(nn.Module):
 
-    def __init__(self):
+    def __init__(self, args):
         super().__init__()
 
+        self.nomodels = args.clusters + 1
         self.conv1 = nn.Conv2d(1, 32, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(32, 64, 5)
         self.fc1 = nn.Linear(64 * 4 * 4, 512)
         self.dropout = nn.Dropout()
-        self.fc2 = nn.Linear(512, 1)
-        self.activation = nn.Sigmoid()
+
+        if self.nomodels <= 2:
+            self.fc2 = nn.Linear(512, 1)
+            self.activation = nn.Sigmoid()
+        else:
+            self.fc2 = nn.Linear(512, self.nomodels)
+            self.activation = nn.Softmax()
 
     def forward(self, x):
 
@@ -195,7 +210,7 @@ class CNNLeaf(nn.Module):
 class CNNCifar(nn.Module):
     def __init__(self, args):
 
-        super(CNNCifar, self).__init__()
+        super().__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5)
@@ -220,7 +235,8 @@ class CNNCifar(nn.Module):
 
 class GateCNN(nn.Module):
     def __init__(self, args):
-        super(GateCNN, self).__init__()
+        super().__init__()
+        self.nomodels = args.clusters + 1
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5)
@@ -228,8 +244,13 @@ class GateCNN(nn.Module):
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
         self.dropout = nn.Dropout()
         self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 1)
-        self.activation = nn.Sigmoid()
+
+        if self.nomodels <= 2:
+            self.fc3 = nn.Linear(84, 1)
+            self.activation = nn.Sigmoid()
+        else:
+            self.fc3 = nn.Linear(84, self.nomodels)
+            self.activation = nn.Softmax()
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
@@ -245,7 +266,7 @@ class GateCNN(nn.Module):
 
 class GateCNNSoftmax(nn.Module):
     def __init__(self, args):
-        super(GateCNNSoftmax, self).__init__()
+        super().__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5)
@@ -268,7 +289,7 @@ class GateCNNSoftmax(nn.Module):
 
 class CNNFashion(nn.Module):
     def __init__(self, args):
-        super(CNNFashion, self).__init__()
+        super().__init__()
         self.conv1 = nn.Conv2d(1, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 12, 5)
@@ -293,7 +314,7 @@ class CNNFashion(nn.Module):
 
 class GateCNNFashion(nn.Module):
     def __init__(self, args):
-        super(GateCNNFashion, self).__init__()
+        super().__init__()
         self.conv1 = nn.Conv2d(1, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 12, 5)
@@ -318,7 +339,7 @@ class GateCNNFashion(nn.Module):
 
 class GateCNNFahsionSoftmax(nn.Module):
     def __init__(self, args):
-        super(GateCNNSoftmax, self).__init__()
+        super().__init__()
         self.conv1 = nn.Conv2d(1, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 12, 5)

@@ -37,13 +37,10 @@ if __name__ == "__main__":
         flags = config.pop("flags")
         # for clusters in range(1, config["clusters"] + 1  )
 
-        if config["dataset"] == "femnist":
-            pvals = [0]
-        else:
-            pvals = np.linspace(.2, 1, 9)
+        epsvals = np.logspace(-2,np.log10(.5),10)
 
         frac = config["frac"]
-        mylogger.info(f"Starting {experiment} from {filename} with p={pvals}")
+        mylogger.info(f"Starting {experiment} from {filename} with eps={epsvals}")
 
         dataset = config["dataset"]
         model = config["model"]
@@ -56,19 +53,11 @@ if __name__ == "__main__":
             mylogger.info(f"Cluster k={clusters}")
             child_processes = []
 
-            for n, p in enumerate(pvals):
+            for n, eps in enumerate(epsvals):
 
                 config["clusters"] = clusters
-                config["p"] = np.round(p / .1) * .1
+                config["eps"] = eps
 
-                if clusters == 2:
-                    config["eps"] = 0.03
-                elif clusters == 3:
-                    config["eps"] = 0.1
-                elif clusters == 4:
-                    config["eps"] = 0.2
-                elif clusters == 5:
-                    config["eps"] = 0.03
                 available_gpus = get_available_gpus()
 
                 if not available_gpus:
@@ -76,7 +65,7 @@ if __name__ == "__main__":
 
                 config["gpu"] = np.random.choice(available_gpus, 1)[0]
 
-                mylogger.debug(f"Assigning p={p} to GPU {gpus[n % number_of_gpus]}")
+                mylogger.debug(f"Assigning eps={eps} to GPU {gpus[n % number_of_gpus]}")
 
                 config["filename"] = "results_clusters"
 
