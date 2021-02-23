@@ -15,7 +15,6 @@ class MyEnsemble(nn.Module):
 
     def forward(self, x):
         """
-        Forward pass
         """
 
         with torch.no_grad():
@@ -114,32 +113,41 @@ class CNNLeafFEMNIST(nn.Module):
 
 class GateCNNLeaf(nn.Module):
 
-    def __init__(self, args):
+    def __init__(self, args, nomodels=None):
         super().__init__()
 
+        self.gatehiddenunits1 = args.gatehiddenunits1
+        self.gatefilters1 = args.gatefilters1
+        self.gatefilters2 = args.gatefilters2
+        self.gatedropout = args.gatedropout
         self.nomodels = args.clusters + 1
-        self.conv1 = nn.Conv2d(3, 32, 5)
+
+        if nomodels:
+            self.nomodels = nomodels
+
+        self.conv1 = nn.Conv2d(3, self.gatefilters1, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(32, 64, 5)
-        self.fc1 = nn.Linear(64 * 5 * 5, 512)
-        self.dropout = nn.Dropout()
+        self.conv2 = nn.Conv2d(self.gatefilters1, self.gatefilters2, 5)
+        self.fc1 = nn.Linear(self.gatefilters2 * 5 * 5, self.gatehiddenunits1)
+        self.dropout = nn.Dropout(p=self.gatedropout)
 
         if self.nomodels <= 2:
-            self.fc2 = nn.Linear(512, 1)
+            self.fc2 = nn.Linear(self.gatehiddenunits1, 1)
             self.activation = nn.Sigmoid()
         else:
-            self.fc2 = nn.Linear(512, self.nomodels)
+            self.fc2 = nn.Linear(self.gatehiddenunits1, self.nomodels)
             self.activation = nn.Softmax()
 
     def forward(self, x):
 
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 64 * 5 * 5)
+        x = x.view(-1, self.gatefilters2 * 5 * 5)
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
         x = F.relu(self.fc2(x))
         x = self.activation(x)
+
         return x
 
 class GateCNNFEMNIST(nn.Module):
@@ -173,6 +181,64 @@ class GateCNNFEMNIST(nn.Module):
         x = self.activation(x)
         return x
 
+class CNNIFCA(nn.Module):
+    """
+    Model from IFCA paper,
+    TODO: Implicit dimension choice for log_softmax has been deprecated
+    """
+
+    def __init__(self, args, model="local"):
+
+        super().__init__()
+
+        if model == "local":
+            self.filters1 = args.localfilters1
+            self.filters2 = args.localfilters2
+            self.hiddenunits1 = args.localhiddenunits1
+            self.hiddenunits2 = args.localhiddenunits2
+            self.dropout = args.localdropout
+        elif model == "fl":
+            self.filters1 = args.flfilters1
+            self.filters2 = args.flfilters2
+            self.hiddenunits1 = args.flhiddenunits1
+            self.hiddenunits2 = args.flhiddenunits2
+            self.dropout = args.fldropout
+        else:
+            self.filters1 = 64
+            self.filters2 = 64
+            self.hiddenunits1 = 384
+            self.hiddenunits2 = 194
+            self.dropout = 0.5
+
+        self.conv1 = nn.Conv2d(3, self.filters1, 5)
+        self.pool = nn.MaxPool2d(2, 2)
+
+        self.norm1 = nn.LocalResponseNorm(4, alpha=0.001 / 9.0)
+        self.conv2 = nn.Conv2d(self.filters1, self.filters2, 5)
+        self.norm2 = nn.LocalResponseNorm(4, alpha=0.001 / 9.0)
+
+        self.fc1 = nn.Linear(self.filters2 * 5 * 5, self.hiddenunits1)
+        self.fc2 = nn.Linear(self.hiddenunits1, self.hiddenunits2)
+
+        self.dropout = nn.Dropout(p=self.dropout)
+        self.fc3 = nn.Linear(self.hiddenunits2, args.num_classes)
+        self.activation = nn.LogSoftmax()
+
+    def forward(self, x):
+        """
+        Forward pass
+        """
+
+        x = self.norm1(self.pool(F.relu(self.conv1(x))))
+        x = self.pool(self.norm2(F.relu(self.conv2(x))))
+        x = x.view(-1, self.filters2 * 5 * 5)
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = F.relu(self.fc2(x))
+        out1 = F.relu(self.fc3(x))
+        out2 = self.activation(out1)
+        return out1, out2
+
 
 class CNNLeaf(nn.Module):
     """
@@ -180,16 +246,32 @@ class CNNLeaf(nn.Module):
     TODO: Implicit dimension choice for log_softmax has been deprecated
     """
 
-    def __init__(self, args):
+    def __init__(self, args, model="local"):
 
         super().__init__()
 
-        self.conv1 = nn.Conv2d(3, 32, 5)
+        if model == "local":
+            self.filters1 = args.localfilters1
+            self.filters2 = args.localfilters2
+            self.hiddenunits = args.localhiddenunits1
+            self.dropout = args.localdropout
+        elif model == "fl":
+            self.filters1 = args.flfilters1
+            self.filters2 = args.flfilters2
+            self.hiddenunits = args.flhiddenunits1
+            self.dropout = args.fldropout
+        else:
+            self.filters1 = 32
+            self.filters2 = 64
+            self.hiddenunits = 512
+            self.dropout = 0.5
+
+        self.conv1 = nn.Conv2d(3, self.filters1, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(32, 64, 5)
-        self.fc1 = nn.Linear(64 * 5 * 5, 512)
-        self.dropout = nn.Dropout()
-        self.fc2 = nn.Linear(512, args.num_classes)
+        self.conv2 = nn.Conv2d(self.filters1, self.filters2, 5)
+        self.fc1 = nn.Linear(self.filters2 * 5 * 5, self.hiddenunits)
+        self.dropout = nn.Dropout(p=self.dropout)
+        self.fc2 = nn.Linear(self.hiddenunits, args.num_classes)
         self.activation = nn.LogSoftmax()
 
     def forward(self, x):
@@ -199,7 +281,7 @@ class CNNLeaf(nn.Module):
 
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 64 * 5 * 5)
+        x = x.view(-1, self.filters2 * 5 * 5)
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
         out1 = F.relu(self.fc2(x))

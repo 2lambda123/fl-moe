@@ -67,12 +67,25 @@ class ClientUpdate(object):
         if self.writer:
             self.writer.close()
 
-    def train(self, net, n_epochs, validate=False, offset=0):
+    def lr_decay(self, global_step,
+                 init_learning_rate=1e-3,
+                 min_learning_rate=1e-5,
+                 decay_rate=0.9999):
+
+        lr = ((init_learning_rate - min_learning_rate) *
+              pow(decay_rate, global_step) +
+              min_learning_rate)
+        return lr
+
+    def train(self, net, n_epochs, validate=False, offset=0, weight_decay=0):
         net.train()
         # train and update
         # TODO: Why does Adam work?
-        optimizer = torch.optim.Adam(net.parameters(), lr=self.lr)
-
+        lr0 = self.lr_decay(0, self.lr, self.lr / 100.0)
+        optimizer = torch.optim.Adam(net.parameters(), lr=self.lr,
+                                     weight_decay=weight_decay)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
+                    lr_lambda=lambda step: self.lr_decay(step, self.lr, self.lr / 100.0) / lr0)
         epoch_loss = np.inf
 
         for epoch in range(n_epochs):
@@ -88,12 +101,12 @@ class ClientUpdate(object):
                 loss = self.loss_func(log_probs, labels)
                 loss.backward()
                 optimizer.step()
+                scheduler.step()
                 batch_loss.append(loss.item())
             epoch_loss = sum(batch_loss) / len(batch_loss)
             if self.writer:
                 self.writer.add_scalar(
                     'fl training loss', epoch_loss, epoch + offset)
-
 
         if validate:
             val_acc, val_loss = self.validate(net)
@@ -106,12 +119,18 @@ class ClientUpdate(object):
 
         return net.state_dict(), epoch_loss
 
-    def train_finetune(self, net, n_epochs, learning_rate):
+    def train_finetune(self, net, n_epochs, learning_rate, weight_decay=0):
         net.train()
         # train and update
-        optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
+        lr0 = self.lr_decay(0, self.lr, self.lr / 100.0)
 
-        patience = 10
+        # TODO add parameter
+        optimizer = torch.optim.Adam(
+            net.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
+                                                      lr_lambda=lambda step: self.lr_decay(step, learning_rate, learning_rate / 100.0) / lr0)
+
+        patience = 4
         epoch_loss = []
         epoch_train_accuracy = []
         model_best = net.state_dict()
@@ -123,7 +142,8 @@ class ClientUpdate(object):
             net.train()
             batch_loss = []
             correct = 0
-            for batch_idx, (images, labels) in enumerate(self.ldr_train):
+
+            for _, (images, labels) in enumerate(self.ldr_train):
                 images, labels = images.to(
                     self.args.device), labels.to(self.args.device)
                 net.zero_grad()
@@ -132,6 +152,7 @@ class ClientUpdate(object):
                 loss = self.loss_func(log_probs, labels)
                 loss.backward()
                 optimizer.step()
+                scheduler.step()
                 batch_loss.append(loss.item())
                 _, predicted = torch.max(log_probs.data, 1)
                 correct += (predicted == labels).sum().item()
@@ -145,7 +166,7 @@ class ClientUpdate(object):
                 self.writer.add_scalar(
                     'local training accuracy', epoch_train_accuracy[-1], epoch)
 
-            if(epoch % 5 == 0):
+            if epoch % 5 == 0:
                 val_acc, val_loss = self.validate(net)
                 #print(iter, val_loss)
 
@@ -165,6 +186,7 @@ class ClientUpdate(object):
                 else:
                     counter = counter + 1
 
+                # Takes 50 iterations!
                 if counter == patience:
                     return model_best, epoch_loss[-1], val_acc_best, train_acc_best
 
@@ -185,7 +207,7 @@ class ClientUpdate(object):
             optimizer = torch.optim.Adam(list(net_local.parameters(
             )) + list(gate.parameters()) + list(net_global.parameters()), lr=learning_rate)
 
-        patience = 10
+        patience = 4
         epoch_loss = []
         gate_best = gate.state_dict()
         val_acc_best = -np.inf
@@ -314,20 +336,24 @@ class ClientUpdate(object):
     #     return gate_best, epoch_loss[-1], val_acc_best, gate_values_best
 
     def train_3(self, nets, gate, train_gate_only,
-                n_epochs, early_stop, learning_rate):
+                n_epochs, early_stop, learning_rate, weight_decay=0):
 
         for net in nets + [gate]:
             net.train()
 
-        params =  list(gate.parameters())
+        params = list(gate.parameters())
         # TODO: Learning rate is different here!
 
         if not train_gate_only:
             params += sum([list(net.parameters()) for net in nets], [])
 
-        optimizer = torch.optim.Adam(params, lr=learning_rate)
+        #lr0 = self.lr_decay(0, self.lr, self.lr / 100.0)
+        optimizer = torch.optim.Adam(
+            params, lr=learning_rate, weight_decay=weight_decay)
+        #scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
+        #                                              lr_lambda=lambda step: self.lr_decay(step, learning_rate, learning_rate / 100.0) / lr0)
 
-        patience = 10
+        patience = 4
         #epoch_loss = []
 
         gate_best = gate.state_dict()
@@ -337,6 +363,10 @@ class ClientUpdate(object):
         gate_values_best = 0
 
         for epoch in range(n_epochs):
+
+            for net in nets + [gate]:
+                net.train()
+
             batch_loss = []
             batch_accuracy = []
             correct = 0
@@ -381,6 +411,7 @@ class ClientUpdate(object):
                 loss = self.loss_func(log_probs, labels)
                 loss.backward()
                 optimizer.step()
+                #scheduler.step()
                 batch_loss.append(loss.item())
 
             this_epoch_loss = np.mean(batch_loss)

@@ -10,6 +10,7 @@ import numpy as np
 from torchvision import datasets, transforms
 import torch
 import sys
+import tempfile
 
 
 from utils.sample_data import mnist_iid, mnist_iid2, mnist_noniid2, \
@@ -20,7 +21,7 @@ from models.ClientUpdate import ClientUpdate
 
 from models.Models import MLP, CNNCifar, GateCNN, GateMLP, CNNFashion, \
     GateCNNFashion, CNNLeaf, \
-    CNNLeafFEMNIST, GateCNNFEMNIST, GateCNNLeaf
+    CNNLeafFEMNIST, GateCNNFEMNIST, GateCNNLeaf, CNNIFCA
 from models.Models import MyEnsemble
 
 from models.FederatedAveraging import FedAvg
@@ -48,14 +49,22 @@ def weights_init(m):
         # torch.nn.init.xavier_uniform(m.weight)
         m.bias.data.fill_(0.01)
 
+def do_explore(iteration, args):
 
-if __name__ == '__main__':
+    if args.explore_strategy == "eps":
+        return np.random.random() < args.eps
+    elif args.explore_strategy == "eps_decay":
+        return np.random.random() < 1.0 / (iteration + 1)
+    elif args.explore_strategy == "eps_decay_k":
+        return np.random.random() < 1.0 / ((iteration + 1)**(2 / args.clusters))
+    else:
+        return False
+
+def main(args):
 
     # A short UUID, perhaps not collision free but close enough
     myid = str(uuid.uuid4())[:8]
     mylogger = get_logger(myid)
-
-    args = args_parser()
 
     # Set up logging to file
     if not os.path.exists(f"save/{args.experiment}"):
@@ -73,7 +82,8 @@ if __name__ == '__main__':
               "val_acc_avg_rep", "val_acc_avg_repft", "val_acc_avg_ensemble",
               "acc_test_mix", "acc_test_locals", "acc_test_fedavg",
               "ft_test_acc", "ft_train_acc", "train_acc_avg_locals",
-              "val_acc_gateonly", "overlap", "run", "clusters", "eps"]
+              "val_acc_gateonly", "overlap", "run", "clusters", "eps",
+              "explore_strategy"]
 
     if not filexist:
         with open(f"save/{args.experiment}/{myid}_{filename}.csv", 'a') as f1:
@@ -124,12 +134,15 @@ if __name__ == '__main__':
         elif args.dataset == 'cifar10':
             trans_cifar = transforms.Compose(
                 [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-            dataset_train = datasets.CIFAR10(
-                '../data/cifar', train=True,
-                download=True, transform=trans_cifar)
-            dataset_test = datasets.CIFAR10(
-                '../data/cifar', train=False,
-                download=True, transform=trans_cifar)
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                dataset_train = datasets.CIFAR10(
+                    tmpdirname, train=True,
+                    download=True,
+                    transform=trans_cifar)
+                dataset_test = datasets.CIFAR10(
+                    tmpdirname, train=False,
+                    download=True,
+                    transform=trans_cifar)
 
             if args.iid:
                 dict_users = cifar_iid(
@@ -138,6 +151,46 @@ if __name__ == '__main__':
                 dict_users, dict_users_test = cifar_noniid2(
                     dataset_train, dataset_test, args.num_clients,
                     args.p, args.n_data, args.n_data_test, args.overlap)
+
+        elif args.dataset == "cifar10rot":
+
+            from Cifar10RotatedDataset import Cifar10RotatedDataset
+
+
+            trans_cifar_train = transforms.Compose(
+                [
+                 transforms.RandomCrop(size=32, padding=4),
+                 transforms.ColorJitter(brightness=.4, contrast=.4, saturation=.4, hue=.4),
+                 transforms.RandomHorizontalFlip(),
+                 transforms.ToTensor(),
+                 transforms.Normalize(
+                    mean=(0.4914, 0.4822, 0.4465),
+                    std=(0.2023, 0.1994, 0.2010))
+                ])
+
+            trans_cifar_test = transforms.Compose(
+                [transforms.ToTensor(),
+                 transforms.Normalize(
+                    mean=(0.4914, 0.4822, 0.4465),
+                    std=(0.2023, 0.1994, 0.2010))
+                ])
+
+            with tempfile.TemporaryDirectory() as tmpdirname:
+
+                dataset_train = Cifar10RotatedDataset(
+                    tmpdirname, train=True,
+                    download=True, transform=trans_cifar_train,
+                    num_clients = args.num_clients,
+                    n_data=args.n_data)
+
+                dataset_test = Cifar10RotatedDataset(
+                    tmpdirname, train=False,
+                    download=True, transform=trans_cifar_test,
+                    num_clients = args.num_clients,
+                    n_data = args.n_data_test)
+
+            dict_users = dataset_train.dict_users
+            dict_users_test = dataset_test.dict_users
 
         elif args.dataset == 'cifar100':
             trans_cifar = transforms.Compose(
@@ -178,6 +231,11 @@ if __name__ == '__main__':
             mylogger.error("Dataset not available")
             raise SystemExit(3)
 
+        train_lengths = [len(v) for k,v  in dict_users.items()]
+        mylogger.debug(f"Training samples: {train_lengths}")
+        test_lengths = [len(v) for k,v  in dict_users_test.items()]
+        mylogger.debug(f"Test samples: {test_lengths}")
+
         img_size = dataset_train[0][0].shape
         mylogger.debug(f"Sample size: {img_size}")
 
@@ -191,7 +249,7 @@ if __name__ == '__main__':
         # TODO: Remove sending to device here?
         if args.model == 'cnn':
 
-            if args.dataset in ['cifar10', 'cifar100']:
+            if args.dataset in ['cifar10', 'cifar100', "cifar10rot"]:
 
                 net_glob_fedAvg = CNNCifar(args=args).to(args.device)
                 gates_e2e_model = GateCNN(args=args).to(args.device)
@@ -205,17 +263,30 @@ if __name__ == '__main__':
 
         elif args.model == 'leaf':
 
-            if args.dataset in ['cifar10', 'cifar100']:
+            if "cifar10" in args.dataset :
 
-                net_glob_fedAvg = CNNLeaf(args=args).to(args.device)
+                net_glob_fedAvg = CNNLeaf(args=args, model="fl").to(args.device)
                 gates_e2e_model = GateCNNLeaf(args=args).to(args.device)
-                net_locals_model = CNNLeaf(args=args).to(args.device)
+                net_locals_model = CNNLeaf(args=args, model="local").to(args.device)
 
-            elif args.dataset in ['mnist', 'fashion-mnist', "femnist"]:
+            elif "mnist" in args.dataset:
 
                 net_glob_fedAvg = CNNLeafFEMNIST(args=args).to(args.device)
                 gates_e2e_model = GateCNNFEMNIST(args=args).to(args.device)
                 net_locals_model = CNNLeafFEMNIST(args=args).to(args.device)
+
+        elif args.model == 'ifca':
+
+            if "cifar10" in args.dataset :
+
+                net_glob_fedAvg = CNNIFCA(args=args, model="fl").to(args.device)
+                gates_e2e_model = GateCNNLeaf(args=args).to(args.device)
+                net_locals_model = CNNIFCA(args=args, model="local").to(args.device)
+
+            else:
+
+                mylogger.error(f"No model implemented for {args.dataset}.")
+                raise SystemExit(2)
 
         elif args.model == 'mlp':
 
@@ -280,7 +351,7 @@ if __name__ == '__main__':
             cluster_train_loss = {c: [] for c in range(args.clusters)}
             cluster_val_loss = {c: [] for c in range(args.clusters)}
             cluster_val_acc = {c: [] for c in range(args.clusters)}
-
+            cluster_clients = {c: 0 for c in range(args.clusters)}
             alpha = {c: [] for c in range(args.clusters)}
 
             m = max(np.ceil(args.frac * args.num_clients), 1).astype(int)
@@ -320,12 +391,12 @@ if __name__ == '__main__':
                             train=True)
                         c_loss.append(cluster_loss_fed)
 
-                        cluster_train_loss[c].append(cluster_loss_fed)
+                        # cluster_train_loss[c].append(cluster_loss_fed)
 
                     if args.clusters > 1:
 
                         # Sometimes randomly pick one
-                        if np.random.random() < args.eps:
+                        if do_explore(iteration, args):
 
                             c_idx = np.random.randint(args.clusters)
 
@@ -345,11 +416,14 @@ if __name__ == '__main__':
                     # 2. Start with that cluster model
                     w_glob_fedAvg, train_loss_fed = client.train(net=copy.deepcopy(
                         net_clusters[c_idx]).to(args.device), n_epochs=args.local_ep,
-                        offset=iteration * args.local_ep)
+                        offset=iteration * args.local_ep,
+                        weight_decay=args.fl_weight_decay)
 
                     cluster_train_loss[c_idx].append(train_loss_fed)
 
                     # 3. Update that cluster
+                    cluster_clients[c_idx] += 1
+
                     w_fedAvg[c_idx].append(copy.deepcopy(w_glob_fedAvg))
 
                     # Weigh models by client dataset size
@@ -371,20 +445,22 @@ if __name__ == '__main__':
                 # Get the loss from the validation set.
                 val_acc_fed, val_loss_fed = client.validate(
                     net=copy.deepcopy(
-                        net_clusters[c]).to(args. device),
+                        net_clusters[c_idx]).to(args. device),
                     train=False)
 
-                cluster_val_loss[c].append(val_loss_fed)
-                cluster_val_acc[c].append(val_acc_fed)
-
+                cluster_val_loss[c_idx].append(val_loss_fed)
+                cluster_val_acc[c_idx].append(val_acc_fed)
 
             # update global model weights
             for c in range(args.clusters):
 
                 if tb_writers[c]:
-                    tb_writers[c].add_scalar('fl training loss', np.mean(cluster_train_loss[c]), iteration)
-                    tb_writers[c].add_scalar('fl validation loss', np.mean(cluster_val_loss[c]), iteration)
-                    tb_writers[c].add_scalar('fl number of clients', len(alpha[c]), iteration)
+                    tb_writers[c].add_scalar('fl training loss', np.mean(
+                        cluster_train_loss[c]), iteration)
+                    tb_writers[c].add_scalar('fl validation loss', np.mean(
+                        cluster_val_loss[c]), iteration)
+                    tb_writers[c].add_scalar(
+                        'fl number of clients', cluster_clients[c], iteration)
 
                 if not w_fedAvg[c]:
                     mylogger.warning(f"Empty FL gradient list for cluster {c} in round {iteration}.")
@@ -443,7 +519,7 @@ if __name__ == '__main__':
                 # TODO: Remove magical constants
                 wt, _, val_acc_finetuned, train_acc_finetuned = client.train_finetune(
                     net=copy.deepcopy(net_clusters[c_idx]).to(args.device),
-                    n_epochs=loc_epochs,
+                    n_epochs=args.loc_epochs,
                     learning_rate=args.ft_lr)
 
                 client_results[idx].update(
@@ -459,72 +535,8 @@ if __name__ == '__main__':
                 ft_net.load_state_dict(wt)
                 finetuned.append(ft_net)
 
-        mylogger.info("Starting training local models")
-        for idx in range(args.num_clients):
-
-            client = ClientUpdate(args=args,
-                                  train_set=dataset_train,
-                                  val_set=dataset_test,
-                                  idxs_train=dict_users[idx],
-                                  idxs_val=dict_users_test[idx],
-                                  parent_id=myid,
-                                  client_id=idx)
-
-            # train local model
-            # TODO: Remove magical constants
-            mylogger.debug(f"Training local model for client {idx}")
-            w_l, _, val_acc_l, train_acc_l = client.train_finetune(
-                net=net_locals[idx].to(args.device),
-                n_epochs=args.loc_epochs,
-                learning_rate=args.local_lr)
-
-            client_results[idx].update(
-                {"local": {
-                    "train": train_acc_l,
-                    "validation": val_acc_l
-                }})
-
-            net_locals[idx].load_state_dict(w_l)
-            val_acc_locals.append(val_acc_l)
-            train_acc_locals.append(train_acc_l)
-
-        mylogger.info("Starting MoE trainings")
-        # TODO: Add each cluster model
-        for idx in range(args.num_clients):
-
-            mylogger.debug(f"Training mixtures for client {idx}")
-
-            client = ClientUpdate(args=args,
-                                  train_set=dataset_train,
-                                  val_set=dataset_test,
-                                  idxs_train=dict_users[idx],
-                                  idxs_val=dict_users_test[idx],
-                                  parent_id=myid,
-                                  client_id=idx)
-
-            # The mixture is trained over all cluster models + the local model
-            nets = [copy.deepcopy(c).to(args.device) for c in net_clusters] + \
-                [net_locals[idx].to(args.device)]
-
-            _, _, val_acc_e2e_k, _ = client.train_3(
-                nets=nets,
-                gate=copy.deepcopy(gates_e2e[idx]),
-                train_gate_only=args.train_gate_only,
-                n_epochs=args.loc_epochs,
-                early_stop=True,
-                learning_rate=args.moe_lr)
-
-            client_results[idx].update(
-                {"mixtures": {
-                    "train": np.nan,
-                    "validation": val_acc_e2e_k
-                }})
-
-            val_acc_e2e.append(val_acc_e2e_k)
-
-        if args.ensembles:
-
-            mylogger.info("Starting Ensemble trainings")
+        if args.train_local:
+            mylogger.info("Starting training local models")
             for idx in range(args.num_clients):
 
                 client = ClientUpdate(args=args,
@@ -535,23 +547,28 @@ if __name__ == '__main__':
                                       parent_id=myid,
                                       client_id=idx)
 
-                mylogger.debug(f"Validating ensembles for client {idx}")
-
-                # TODO: This now only works on Cifar 10 :)
-                ensemble_model = MyEnsemble([copy.deepcopy(c).to(args.device) for c in net_clusters])
-
-                val_acc_ensemble_k, val_loss_ensemble_k = client.validate(ensemble_model)
+                # train local model
+                # TODO: Remove magical constants
+                mylogger.debug(f"Training local model for client {idx}")
+                w_l, _, val_acc_l, train_acc_l = client.train_finetune(
+                    net=net_locals[idx].to(args.device),
+                    n_epochs=args.loc_epochs,
+                    learning_rate=args.local_lr)
 
                 client_results[idx].update(
-                    {"ensemble": {
-                        "train": np.nan,
-                        "validation": val_acc_ensemble_k
+                    {"local": {
+                        "train": train_acc_l,
+                        "validation": val_acc_l
                     }})
 
-                val_acc_ensemble.append(val_acc_ensemble_k)
+                net_locals[idx].load_state_dict(w_l)
+                val_acc_locals.append(val_acc_l)
+                train_acc_locals.append(train_acc_l)
 
         mylogger.info("Starting FL evaluation")
         # TODO: Evaluate each cluster, best one the client belonged to?
+
+        cluster_use = [0 for x in range(args.clusters)]
 
         for idx in range(args.num_clients):
 
@@ -579,23 +596,115 @@ if __name__ == '__main__':
             # Pick one on randoms if multiple
             c_idx = np.random.choice(c_indicies[0], 1)[0]
 
+            cluster_use[c_idx] += 1
+
             # Evaluate on validation set
             cluster_val_acc, _ = client.validate(
-                    net=net_clusters[c_idx].to(args.device), train=False)
+                net=net_clusters[c_idx].to(args.device), train=False)
 
             client_results[idx].update(
                 {"fedavg": {
                     "train": np.nan,
-                    "validation": np.max(cluster_val_acc)
+                    "validation": np.max(cluster_val_acc),
+                    "cluster": int(c_idx)
                 }})
 
             val_acc_fedavg.append(np.max(cluster_val_acc))
 
+        # TODO: Add to output somehow.
+        for c in range(args.clusters):
+            mylogger.debug(f"Cluster {c} model is used {cluster_use[c]} times.")
+            if cluster_use[c] == 0:
+                mylogger.warning(f"Cluster {c} model is never used.")
+
+        mylogger.info("Starting MoE trainings")
+        # TODO: Add each cluster model
+        for idx in range(args.num_clients):
+
+            mylogger.debug(f"Training mixtures for client {idx}")
+
+            client = ClientUpdate(args=args,
+                                  train_set=dataset_train,
+                                  val_set=dataset_test,
+                                  idxs_train=dict_users[idx],
+                                  idxs_val=dict_users_test[idx],
+                                  parent_id=myid,
+                                  client_id=idx)
+
+            # The mixture is trained over all (used) cluster models + the local model
+
+            nets = [copy.deepcopy(net_clusters[c]).to(args.device)
+                    for c in range(args.clusters) if cluster_use[c] > 0]
+
+            if args.train_local:
+                nets += [net_locals[idx].to(args.device)]
+
+            # TODO: FIX FIX FIX
+            # Ugly hack when number of models is not the same as number of clusters
+            gates_e2e[idx] = GateCNNLeaf(
+                args=args, nomodels=len(nets)).to(args.device)
+            gates_e2e[idx].apply(weights_init)
+
+            _, _, val_acc_e2e_k, _ = client.train_3(
+                nets=nets,
+                gate=copy.deepcopy(gates_e2e[idx]),
+                train_gate_only=args.train_gate_only,
+                n_epochs=args.moe_epochs,
+                early_stop=True,
+                learning_rate=args.moe_lr,
+                weight_decay=args.gate_weight_decay)
+
+            client_results[idx].update(
+                {"mixtures": {
+                    "train": np.nan,
+                    "validation": val_acc_e2e_k
+                }})
+
+            val_acc_e2e.append(val_acc_e2e_k)
+
+        if args.ensembles:
+
+            mylogger.info("Starting Ensemble trainings")
+            for idx in range(args.num_clients):
+
+                client = ClientUpdate(args=args,
+                                      train_set=dataset_train,
+                                      val_set=dataset_test,
+                                      idxs_train=dict_users[idx],
+                                      idxs_val=dict_users_test[idx],
+                                      parent_id=myid,
+                                      client_id=idx)
+
+                mylogger.debug(f"Validating ensembles for client {idx}")
+
+                nets = [copy.deepcopy(net_clusters[c]).to(args.device)
+                       for c in range(args.clusters) if cluster_use[c] > 0]
+
+                if args.train_local:
+                    nets += [net_locals[idx].to(args.device)]
+
+                # TODO: This now only works on Cifar 10 :)
+                ensemble_model = MyEnsemble(nets)
+
+                val_acc_ensemble_k, val_loss_ensemble_k = client.validate(
+                    ensemble_model)
+
+                client_results[idx].update(
+                    {"ensemble": {
+                        "train": np.nan,
+                        "validation": val_acc_ensemble_k
+                    }})
+
+                val_acc_ensemble.append(val_acc_ensemble_k)
+
         # Calculate validation and test accuracies
 
-        val_acc_avg_locals = np.mean(val_acc_locals)
-
-        train_acc_avg_locals = np.mean(train_acc_locals)
+        if args.train_local:
+            val_acc_avg_locals = np.mean(val_acc_locals)
+            train_acc_avg_locals = np.mean(train_acc_locals)
+        else:
+            val_acc_avg_locals = np.nan
+            train_acc_avg_locals = np.nan
 
         val_acc_avg_e2e = np.mean(val_acc_e2e)
         # val_acc_avg_e2e = np.nan
@@ -637,7 +746,7 @@ if __name__ == '__main__':
 
         # TODO: Make experiment directories
         with open(f'save/{args.experiment}/{filename}.csv', 'a') as f1:
-            f1.write('{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{}'.format(
+            f1.write('{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{}'.format(
                 myid,
                 args.dataset, args.model, args.epochs, args.local_ep,
                 args.num_clients, args.iid, args.p, args.opt, args.n_data,
@@ -649,7 +758,7 @@ if __name__ == '__main__':
                 acc_test_mix, acc_test_locals, acc_test_fedavg, ft_test_acc,
                 ft_train_acc, train_acc_avg_locals,
                 val_acc_avg_gateonly, args.overlap, run, args.clusters,
-                args.eps))
+                args.eps, args.explore_strategy))
             f1.write("\n")
         mylogger.info("Done")
 
@@ -657,4 +766,11 @@ if __name__ == '__main__':
             if w:
                 w.close()
 
+    return val_acc_avg_locals, val_acc_avg_fedavg, val_acc_avg_e2e
+
+
+
+if __name__ == '__main__':
+    args = args_parser()
+    main(args)
     sys.exit(0)

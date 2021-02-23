@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 
 
 class FemnistDataset(Dataset):
-    """Face Landmarks dataset."""
+    """FEMNIST dataset."""
 
     def __init__(self, root_dir, train=True, transform=None, random_seed=42):
         """

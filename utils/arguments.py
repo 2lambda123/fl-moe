@@ -21,11 +21,38 @@ def args_parser():
     parser.add_argument('--overlap', action='store_true', help='whether to allow label overlap between clients or not')
     # model argumentsiter
     parser.add_argument('--model', type=str, default='cnn', help='which model to use')
+
     parser.add_argument('--optim', type=str, default='sgd')
     parser.add_argument('--num_classes', type=int, default=10, help="number of classes")
     parser.add_argument('--channels', type=int, default=3, help="number of channels")
     # other arguments
+    parser.add_argument('--explore_strategy', default='default', help='which exploration strategy to use')
     parser.add_argument('--clusters', type=int, default=1, help="Number of clusters")
+
+    parser.add_argument('--train_gate_only', action='store_true', help='whether to train gate only or not')
+    parser.add_argument('--gatehiddenunits1', type=int, default=512, help="Number of hidden units in fc layer of gate")
+    parser.add_argument('--gatehiddenunits2', type=int, default=512, help="Number of hidden units in fc layer of gate")
+    parser.add_argument('--gatefilters1', type=int, default=32, help="Number of hidden units in fc layer of gate")
+    parser.add_argument('--gatefilters2', type=int, default=64, help="Number of hidden units in fc layer of gate")
+    parser.add_argument('--gate_weight_decay', type=float, default=1e-4, help="MoE weight decay")
+    parser.add_argument('--gatedropout', type=float, default=0.5, help="MoE dropout")
+
+    parser.add_argument('--localhiddenunits1', type=int, default=512, help="Number of hidden units in fc layer 1 of local")
+    parser.add_argument('--localhiddenunits2', type=int, default=512, help="Number of hidden units in fc layer 2 of local")
+    parser.add_argument('--localfilters1', type=int, default=32, help="Number of hidden units in fc layer of local")
+    parser.add_argument('--localfilters2', type=int, default=64, help="Number of hidden units in fc layer of local")
+    parser.add_argument('--local_weight_decay', type=float, default=1e-4, help="Local weight decay")
+    parser.add_argument('--localdropout', type=float, default=0.5, help="local dropout")
+
+    parser.add_argument('--flhiddenunits1', type=int, default=512, help="Number of hidden units in fc layer 1 of FL")
+    parser.add_argument('--flhiddenunits2', type=int, default=512, help="Number of hidden units in fc layer 2 of FL")
+    parser.add_argument('--flfilters1', type=int, default=32, help="Number of hidden units in fc layer of local")
+    parser.add_argument('--flfilters2', type=int, default=64, help="Number of hidden units in fc layer of local")
+    parser.add_argument('--fl_weight_decay', type=float, default=1e-4, help="FL weight decay")
+    parser.add_argument('--fldropout', type=float, default=0.5, help="local dropout")
+
+    parser.add_argument('--ft_weight_decay', type=float, default=1e-4, help="Finetuning weight decay")
+
     parser.add_argument('--dataset', type=str, default='mnist', help="name of dataset")
     parser.add_argument('--iid', action='store_true', help='whether i.i.d or not')
     parser.add_argument('--gpu', type=int, default=0, help="GPU ID, -1 for CPU")
@@ -34,13 +61,14 @@ def args_parser():
     parser.add_argument('--runs', type=int, default=1, help='number of runs to do experiment')
     parser.add_argument('--opt', type=float, default=0.5, help='fraction of clients that opt-in (default: 0.5)')
     parser.add_argument('--p', type=float, default = 0.3, help='majority class percentage (default: 0.3)')
-    parser.add_argument('--train_gate_only', action='store_true', help='whether to train gate only or not')
     parser.add_argument('--finetuning', action='store_true', help='whether to train finetuned models or not')
     parser.add_argument('--ensembles', action='store_true', help='whether to train ensemble models or not')
     parser.add_argument('--tensorboard', action='store_true', help='output tensorboard logs')
+    parser.add_argument('--train_local', action='store_true', help='train local models')
 
     # TODO: Rename
-    parser.add_argument('--loc_epochs', type=int, default=200, help="number of iterations for local and MOE training")
+    parser.add_argument('--loc_epochs', type=int, default=200, help="number of iterations for local training")
+    parser.add_argument('--moe_epochs', type=int, default=200, help="number of iterations for MOE training")
 
     # output arguments
     parser.add_argument('--filename', type=str, default='result', help='output filename')

@@ -6,6 +6,9 @@ import argparse
 import torch.cuda as cutorch
 from utils.gpuutils import get_available_gpus
 import time
+import os
+import shutil
+import pprint
 
 def args_parser():
     parser = argparse.ArgumentParser()
@@ -14,9 +17,18 @@ def args_parser():
         '--filename', default=[], help='configuration filename',
         action="append")
     parser.add_argument('--dry-run', action='store_true', help='do not fire')
-
+    parser.add_argument('--min_clusters', type=int, default=1, help="Minimum number of clusters to try")
+    parser.add_argument('--max_clusters', type=int, default=5, help="Minimum number of clusters to try")
     return parser.parse_args()
 
+def get_fields(d):
+    fields = []
+    for key, value in d.items():
+        if isinstance(value, dict):
+            fields.extend(get_fields(value))
+        else:
+            fields.extend([f"--{key}", str(value)])
+    return fields
 
 if __name__ == "__main__":
 
@@ -24,56 +36,65 @@ if __name__ == "__main__":
     mylogger = get_logger("Iterator")
 
     mylogger.debug(args)
-    # Loop over multiple files
 
+    # Loop over multiple files
     gpus = get_available_gpus()
     number_of_gpus = len(gpus)
     mylogger.debug(f"gpus: {gpus}")
 
     for filename in args.filename:
 
+        # Read config
         config = read_config(filename)
-        experiment = config.get("experiment","default")
-        flags = config.pop("flags")
-        # for clusters in range(1, config["clusters"] + 1  )
+        experiment = config.pop("experiment")
+        experiment_name = experiment.get("name", "default")
 
-        if config["dataset"] == "femnist":
+        # Set up output paths
+        log_path = f"save/{experiment_name}"
+        if not os.path.exists(log_path):
+            os.makedirs(log_path, exist_ok=True)
+
+        # Copy experiment parameters for later reference
+        shutil.copy2(filename, os.path.join(log_path,"experiment.json"))
+
+        flags = experiment.pop("flags")
+
+        config["runs"] = experiment.get("runs", 1)
+        config["experiment"] = experiment_name
+
+        if config["data"]["dataset"] == "femnist":
+            pvals = [0]
+        elif config["data"]["dataset"] == "cifar10rot":
             pvals = [0]
         else:
-            pvals = np.linspace(.2, 1, 9)
+            pvals = np.linspace(.8, 1, 3)
 
-        frac = config["frac"]
-        mylogger.info(f"Starting {experiment} from {filename} with p={pvals}")
+        frac = config["federated"]["frac"]
+        mylogger.info(f"Starting {experiment_name} from {filename} with p={pvals}")
 
-        dataset = config["dataset"]
+        dataset = config["data"]["dataset"]
         model = config["model"]
 
-        cluster_list = range(1, 5 + 1)
+        cluster_list = range(args.min_clusters, args.max_clusters + 1)
 
         # Make variable replacable
+        child_processes = []
+
         for clusters in cluster_list:
-            #config["frac"] = clusters * frac
+
             mylogger.info(f"Cluster k={clusters}")
-            child_processes = []
 
             for n, p in enumerate(pvals):
 
-                config["clusters"] = clusters
-                config["p"] = np.round(p / .1) * .1
+                config["federated"]["clusters"] = clusters
+                config["data"]["p"] = np.round(p / .1) * .1
 
-                if clusters == 2:
-                    config["eps"] = 0.03
-                elif clusters == 3:
-                    config["eps"] = 0.1
-                elif clusters == 4:
-                    config["eps"] = 0.2
-                elif clusters == 5:
-                    config["eps"] = 0.03
                 available_gpus = get_available_gpus()
 
-                if not available_gpus:
+                while not available_gpus:
                     time.sleep(60)
 
+                # Add back GPU
                 config["gpu"] = np.random.choice(available_gpus, 1)[0]
 
                 mylogger.debug(f"Assigning p={p} to GPU {gpus[n % number_of_gpus]}")
@@ -82,8 +103,7 @@ if __name__ == "__main__":
 
                 command = ["python", "main_fed.py"]
 
-                for k, v in config.items():
-                    command.extend([f"--{k}", str(v)])
+                command.extend(get_fields(config))
 
                 for k, v in flags.items():
                     if v:
@@ -98,5 +118,5 @@ if __name__ == "__main__":
 
                 time.sleep(20)
 
-            for cp in child_processes:
-                cp.wait()
+        for cp in child_processes:
+            cp.wait()
