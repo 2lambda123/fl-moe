@@ -99,6 +99,42 @@ def main(args):
             f1.write(";".join(fields))
             f1.write('\n')
 
+    trans_cifar10_test = transforms.Compose(
+        [transforms.ToTensor(),
+         transforms.Normalize(
+            mean=(0.4915, 0.4822, 0.4466),
+            std=(0.2470, 0.2435, 0.2616))
+        ])
+
+    trans_cifar10_train = transforms.Compose(
+                [
+                 transforms.RandomCrop(size=32, padding=4),
+                 transforms.ColorJitter(brightness=.4, contrast=.4, saturation=.4, hue=.4),
+                 transforms.RandomHorizontalFlip(),
+                 transforms.ToTensor(),
+                 transforms.Normalize(
+                    mean=(0.4915, 0.4822, 0.4466),
+                    std=(0.2470, 0.2435, 0.2616))
+                ])
+
+    trans_cifar100_test = transforms.Compose(
+        [transforms.ToTensor(),
+         transforms.Normalize(
+            mean=(0.4915, 0.4822, 0.4466),
+            std=(0.2470, 0.2435, 0.2616))
+        ])
+
+    trans_cifar100_train = transforms.Compose(
+                [
+                 transforms.RandomCrop(size=32, padding=4),
+                 transforms.ColorJitter(brightness=.4, contrast=.4, saturation=.4, hue=.4),
+                 transforms.RandomHorizontalFlip(),
+                 transforms.ToTensor(),
+                 transforms.Normalize(
+                    mean=(0.4915, 0.4822, 0.4466),
+                    std=(0.2470, 0.2435, 0.2616))
+                ])
+
     # TODO: print warnings if arguments are not used (p, overlap)
     for run in range(args.runs):
 
@@ -144,17 +180,16 @@ def main(args):
             dict_users_test = rename_keys(dataset_test.dict_users)
 
         elif args.dataset == 'cifar10':
-            trans_cifar = transforms.Compose(
-                [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
             with tempfile.TemporaryDirectory() as tmpdirname:
                 dataset_train = datasets.CIFAR10(
                     tmpdirname, train=True,
                     download=True,
-                    transform=trans_cifar)
+                    transform=trans_cifar10_train)
                 dataset_test = datasets.CIFAR10(
                     tmpdirname, train=False,
                     download=True,
-                    transform=trans_cifar)
+                    transform=trans_cifar10_test)
 
             if args.iid:
                 dict_users = cifar_iid(
@@ -169,35 +204,17 @@ def main(args):
             from Cifar10RotatedDataset import Cifar10RotatedDataset
 
 
-            trans_cifar_train = transforms.Compose(
-                [
-                 transforms.RandomCrop(size=32, padding=4),
-                 transforms.ColorJitter(brightness=.4, contrast=.4, saturation=.4, hue=.4),
-                 transforms.RandomHorizontalFlip(),
-                 transforms.ToTensor(),
-                 transforms.Normalize(
-                    mean=(0.4914, 0.4822, 0.4465),
-                    std=(0.2023, 0.1994, 0.2010))
-                ])
-
-            trans_cifar_test = transforms.Compose(
-                [transforms.ToTensor(),
-                 transforms.Normalize(
-                    mean=(0.4914, 0.4822, 0.4465),
-                    std=(0.2023, 0.1994, 0.2010))
-                ])
-
             with tempfile.TemporaryDirectory() as tmpdirname:
 
                 dataset_train = Cifar10RotatedDataset(
                     tmpdirname, train=True,
-                    download=True, transform=trans_cifar_train,
+                    download=True, transform=trans_cifar10_train,
                     num_clients = args.num_clients,
                     n_data=args.n_data)
 
                 dataset_test = Cifar10RotatedDataset(
                     tmpdirname, train=False,
-                    download=True, transform=trans_cifar_test,
+                    download=True, transform=trans_cifar10_test,
                     num_clients = args.num_clients,
                     n_data = args.n_data_test)
 
@@ -205,14 +222,13 @@ def main(args):
             dict_users_test = dataset_test.dict_users
 
         elif args.dataset == 'cifar100':
-            trans_cifar = transforms.Compose(
-                [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
             dataset_train = datasets.CIFAR100(
                 '../data/cifar100', train=True, download=True,
-                transform=trans_cifar)
+                transform=trans_cifar100_train)
             dataset_test = datasets.CIFAR100(
                 '../data/cifar100', train=False, download=True,
-                transform=trans_cifar)
+                transform=trans_cifar100_test)
 
             if args.iid:
                 dict_users = cifar_iid(dataset_train, args.num_clients)
