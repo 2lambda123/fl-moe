@@ -11,6 +11,7 @@ from torchvision import datasets, transforms
 import torch
 import sys
 import tempfile
+from utils.gpuutils import get_available_gpus
 
 
 from utils.sample_data import mnist_iid, mnist_iid2, mnist_noniid2, \
@@ -66,6 +67,14 @@ def main(args):
     myid = str(uuid.uuid4())[:8]
     mylogger = get_logger(myid)
 
+    if args.gpu:
+        gpudevice = args.gpu
+    else:
+        available_gpus = get_available_gpus()
+        gpudevice = np.random.choice(available_gpus, 1)[0]
+
+    mylogger.debug(f"GPU {gpudevice} assigned.")
+
     # Set up logging to file
     if not os.path.exists(f"save/{args.experiment}"):
         os.makedirs(f"save/{args.experiment}", exist_ok=True)
@@ -93,7 +102,10 @@ def main(args):
     # TODO: print warnings if arguments are not used (p, overlap)
     for run in range(args.runs):
 
-        args.device = torch.device('cuda:{}'.format(args.gpu))
+        if gpudevice == -1:
+            args.device = torch.device('cpu')
+        else:
+            args.device = torch.device(f"cuda:{gpudevice}")
 
         # Create datasets TODO: Refactor
         # TODO: Remove to device?
