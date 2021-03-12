@@ -28,11 +28,11 @@
    "federated": {
         "epochs": 600,
         "clusters": 1,
-        "explore_strategy": "eps",
+        "explore_strategy": "eps_decay_k",
         "num_clients": 200,
         "lr": 0.0005148018487563463,
         "frac": 0.1,
-        "eps": 0.1,
+        "eps": 0.8152836152434226,
         "local_bs": 50,
         "local_ep": 5,
         "fldropout": 0.21621028185876315,

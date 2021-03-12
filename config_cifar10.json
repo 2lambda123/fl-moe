@@ -1,6 +1,6 @@
 {
     "experiment": {
-        "name":"cifar10_longer",
+        "name":"cifar10_K20_C1",
         "gpu": 0,
         "runs": 1,
         "filename": "results_clusters",
@@ -15,7 +15,7 @@
     },
     "data": {
         "dataset": "cifar10",
-        "n_data": 500,
+        "n_data": 100,
         "n_data_test": 100,
         "num_classes": 10,
         "opt": 0,
@@ -28,10 +28,10 @@
    "federated": {
         "epochs": 100,
         "clusters": 2,
-        "explore_strategy": "eps_decay_k",
-        "num_clients": 50,
+        "explore_strategy": "eps",
+        "num_clients": 20,
         "lr": 0.030445327843961433,
-        "frac": 0.1,
+        "frac": 1.0,
         "local_bs": 10,
         "local_ep": 3,
         "fldropout": 0.6404212293699225,
