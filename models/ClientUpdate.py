@@ -80,9 +80,8 @@ class ClientUpdate(object):
     def train(self, net, n_epochs, validate=False, offset=0, weight_decay=0):
         net.train()
         # train and update
-        # TODO: Why does Adam work?
         lr0 = self.lr_decay(0, self.lr, self.lr / 100.0)
-        optimizer = torch.optim.Adam(net.parameters(), lr=self.lr,
+        optimizer = torch.optim.SGD(net.parameters(), lr=self.lr,
                                      weight_decay=weight_decay)
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
                     lr_lambda=lambda step: self.lr_decay(step, self.lr, self.lr / 100.0) / lr0)
