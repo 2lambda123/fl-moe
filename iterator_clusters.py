@@ -1,14 +1,15 @@
-import subprocess
 import json
 from utils.util import read_config, get_logger
 import numpy as np
 import argparse
-import torch.cuda as cutorch
-from utils.gpuutils import get_available_gpus
+#from utils.gpuutils import get_available_gpus
 import time
 import os
 import shutil
 import pprint
+from k8s_helper import *
+from kubernetes import client, config
+
 
 def args_parser():
     parser = argparse.ArgumentParser()
@@ -17,9 +18,18 @@ def args_parser():
         '--filename', default=[], help='configuration filename',
         action="append")
     parser.add_argument('--dry-run', action='store_true', help='do not fire')
-    parser.add_argument('--min_clusters', type=int, default=1, help="Minimum number of clusters to try")
-    parser.add_argument('--max_clusters', type=int, default=5, help="Minimum number of clusters to try")
+    parser.add_argument('--min_clusters', type=int, default=1,
+                        help="Minimum number of clusters to try")
+    parser.add_argument('-j', nargs='+', type=int)
+    parser.add_argument('--max_clusters', type=int, default=5,
+                        help="Minimum number of clusters to try")
+    parser.add_argument('--runs', type=int, default=1,
+                        help="Minimum number of clusters to try")
+    parser.add_argument('--splits', type=int, default=1,
+                        help="Split job into parts")
+    parser.add_argument('--name', type=str, required=True)
     return parser.parse_args()
+
 
 def get_fields(d):
     fields = []
@@ -30,93 +40,57 @@ def get_fields(d):
             fields.extend([f"--{key}", str(value)])
     return fields
 
+
 if __name__ == "__main__":
 
+    config.load_kube_config()
+    batch_v1 = client.BatchV1Api()
+
     args = args_parser()
+
     mylogger = get_logger("Iterator")
 
     mylogger.debug(args)
 
-    # Loop over multiple files
-    gpus = get_available_gpus()
-    number_of_gpus = len(gpus)
-    mylogger.debug(f"gpus: {gpus}")
+    user = "eisamar"
+    gen_name = f"{user}-{args.name}"
 
     for filename in args.filename:
 
-        # Read config
-        config = read_config(filename)
-        experiment = config.pop("experiment")
-        experiment_name = experiment.get("name", "default")
+        mylogger.info(f"Starting experiment from {filename}")
 
-        # Set up output paths
-        log_path = f"save/{experiment_name}"
-        if not os.path.exists(log_path):
-            os.makedirs(log_path, exist_ok=True)
+        basename = os.path.splitext(os.path.basename(filename))[
+            0].replace("config_", "").replace("_", "-")
+        job_name = f"{gen_name}-{basename}-"
 
-        # Copy experiment parameters for later reference
-        shutil.copy2(filename, os.path.join(log_path,"experiment.json"))
+        raw_clusters = np.arange(args.min_clusters, args.max_clusters + 1)
+        if args.j is not None:
+            raw_clusters = np.array(args.j)
 
-        flags = experiment.pop("flags")
+        for run in range(args.runs):
+            for strategy in ["none", "eps", "eps_decay_k"]:
+                for clusters in np.array_split(raw_clusters, args.splits):
 
-        config["runs"] = experiment.get("runs", 1)
-        config["experiment"] = experiment_name
+                    if len(clusters) == 1:
+                        c = str(clusters[0])
+                    else:
+                        c = " ".join(map(str, clusters))
 
-        if config["data"]["dataset"] == "femnist":
-            pvals = [0]
-        elif config["data"]["dataset"] == "cifar10rot":
-            pvals = [0]
-        else:
-            pvals = np.linspace(.8, 1, 3)
+                    command = ["python",
+                               "iterator_clusters_old.py",
+                               "--min_clusters", str(min(clusters)),
+                               "--max_clusters", str(max(clusters)),
+                               "--explore_strategy", strategy,
+                               "--filename", filename]
 
-        frac = config["federated"]["frac"]
-        mylogger.info(f"Starting {experiment_name} from {filename} with p={pvals}")
+                    job_name_r = job_name + str(run) + "-"
+                    mylogger.debug(job_name_r + " - " + " ".join(command))
 
-        dataset = config["data"]["dataset"]
-        model = config["model"]
+                    # Allow dry-runs
+                    if not args.dry_run:
 
-        cluster_list = range(args.min_clusters, args.max_clusters + 1)
+                        create_job(
+                            batch_v1,
+                            create_job_object(command, gen_name=job_name_r))
 
-        # Make variable replacable
-        child_processes = []
-
-        for clusters in cluster_list:
-
-            mylogger.info(f"Cluster k={clusters}")
-
-            for n, p in enumerate(pvals):
-
-                config["federated"]["clusters"] = clusters
-                config["data"]["p"] = np.round(p / .1) * .1
-
-                available_gpus = get_available_gpus()
-
-                while not available_gpus:
-                    time.sleep(60)
-
-                # Add back GPU
-                config["gpu"] = np.random.choice(available_gpus, 1)[0]
-
-                mylogger.debug(f"Assigning p={p} to GPU {gpus[n % number_of_gpus]}")
-
-                config["filename"] = "results_clusters"
-
-                command = ["python", "main_fed.py"]
-
-                command.extend(get_fields(config))
-
-                for k, v in flags.items():
-                    if v:
-                        command.append(f"--{k}")
-
-                mylogger.debug(" ".join(command))
-
-                # Allow dry-runs
-                if not args.dry_run:
-                    p = subprocess.Popen(command, shell=False)
-                    child_processes.append(p)
-
-                time.sleep(20)
-
-        for cp in child_processes:
-            cp.wait()
+                    #gpu_count += 1

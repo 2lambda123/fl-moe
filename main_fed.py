@@ -605,7 +605,7 @@ def main(args):
                     net=net_clusters[c].to(args.device), train=True)
                 cluster_train_loss.append(train_loss_fed)
 
-              # Returns all indicies
+            # Returns all indicies
             c_indicies = np.where(
                 cluster_train_loss == np.min(cluster_train_loss))
 
