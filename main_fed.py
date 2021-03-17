@@ -422,7 +422,10 @@ def main(args):
                                 c_loss == np.min(c_loss))
 
                             # If more than one, pick one on random
-                            c_idx = np.random.choice(c_indicies[0], 1)[0]
+                            try:
+                                c_idx = np.random.choice(c_indicies[0], 1)[0]
+                            except ValueError:
+                                c_idx = np.random.randint(args.clusters)
 
                         mylogger.debug(f"Client {idx} chose cluster {c_idx}.")
 
@@ -606,8 +609,9 @@ def main(args):
                 cluster_train_loss.append(train_loss_fed)
 
             # Returns all indicies
+            # np.nanmin is required in case any returned loss is nan
             c_indicies = np.where(
-                cluster_train_loss == np.min(cluster_train_loss))
+                cluster_train_loss == np.nanmin(cluster_train_loss))
 
             # Pick one on randoms if multiple
             c_idx = np.random.choice(c_indicies[0], 1)[0]
@@ -657,8 +661,14 @@ def main(args):
 
             # TODO: FIX FIX FIX
             # Ugly hack when number of models is not the same as number of clusters
-            gates_e2e[idx] = GateCNNLeaf(
-                args=args, nomodels=len(nets)).to(args.device)
+
+            if args.dataset == "femnist":
+                gates_e2e[idx] = GateCNNFEMNIST(
+                    args=args, nomodels=len(nets)).to(args.device)
+            else:
+                gates_e2e[idx] = GateCNNLeaf(
+                    args=args, nomodels=len(nets)).to(args.device)
+
             gates_e2e[idx].apply(weights_init)
 
             _, _, val_acc_e2e_k, _ = client.train_3(

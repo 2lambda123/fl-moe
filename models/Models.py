@@ -92,9 +92,9 @@ class CNNLeafFEMNIST(nn.Module):
         self.conv1 = nn.Conv2d(1, 32, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(32, 64, 5)
-        self.fc1 = nn.Linear(64 * 4 * 4, 512)
+        self.fc1 = nn.Linear(64 * 4 * 4, 2048)
         self.dropout = nn.Dropout()
-        self.fc2 = nn.Linear(512, args.num_classes)
+        self.fc2 = nn.Linear(2048, args.num_classes)
         self.activation = nn.LogSoftmax()
 
     def forward(self, x):
@@ -111,6 +111,7 @@ class CNNLeafFEMNIST(nn.Module):
         out2 = self.activation(out1)
         return out1, out2
 
+
 class GateCNNLeaf(nn.Module):
 
     def __init__(self, args, nomodels=None):
@@ -125,7 +126,7 @@ class GateCNNLeaf(nn.Module):
         if nomodels:
             self.nomodels = nomodels
 
-        self.conv1 = nn.Conv2d(3, self.gatefilters1, 5)
+        self.conv1 = nn.Conv2d(args.channels, self.gatefilters1, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(self.gatefilters1, self.gatefilters2, 5)
         self.fc1 = nn.Linear(self.gatefilters2 * 5 * 5, self.gatehiddenunits1)
@@ -152,10 +153,14 @@ class GateCNNLeaf(nn.Module):
 
 class GateCNNFEMNIST(nn.Module):
 
-    def __init__(self, args):
+    def __init__(self, args, nomodels=None):
         super().__init__()
 
         self.nomodels = args.clusters + 1
+
+        if nomodels:
+            self.nomodels = nomodels
+
         self.conv1 = nn.Conv2d(1, 32, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(32, 64, 5)
@@ -170,7 +175,6 @@ class GateCNNFEMNIST(nn.Module):
             self.activation = nn.Softmax()
 
     def forward(self, x):
-
 
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))

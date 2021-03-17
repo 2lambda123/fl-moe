@@ -1,13 +1,13 @@
 {
     "experiment": {
-        "name":"cifar10_K20_C1",
+        "name":"cifar10_K20_C1_tuned",
         "gpu": 0,
         "runs": 1,
         "filename": "results_clusters",
         "flags": {
             "overlap": true,
             "finetuning": false,
-            "train_gate_only": true,
+            "train_gate_only": false,
             "train_local": true,
             "ensembles": true,
             "tensorboard": false
@@ -15,11 +15,11 @@
     },
     "data": {
         "dataset": "cifar10",
-        "n_data": 100,
+        "n_data": 500,
         "n_data_test": 100,
         "num_classes": 10,
         "opt": 0,
-        "p": 0.9,
+        "p": 0.2,
         "train_frac": 0.5
     },
     "model": {
@@ -30,16 +30,16 @@
         "clusters": 2,
         "explore_strategy": "eps",
         "num_clients": 20,
-        "lr": 0.030445327843961433,
+        "lr": 0.0869440470648931,
         "frac": 1.0,
         "local_bs": 10,
         "local_ep": 3,
-        "fldropout": 0.6404212293699225,
+        "fldropout": 0.4163572204706245,
         "flhiddenunits1": 512,
-        "flfilters1": 16,
-        "flfilters2": 32,
-        "fl_weight_decay": 0.0003878171043125037,
-        "eps": 0.8712605628038793
+        "flfilters1": 32,
+        "flfilters2": 64,
+        "fl_weight_decay": 0.0002557773556451872,
+        "eps": 0.23254219945701154
     },
     "finetuning": {
         "ft_lr": 1e-4,
@@ -47,22 +47,22 @@
     },
     "local": {
         "loc_epochs": 200,
-        "local_lr": 0.005856140156550244,
-        "local_weight_decay": 0.0009382061406615534,
-        "localdropout": 0.647346863804489,
-        "localhiddenunits1": 128,
-        "localfilters1": 16,
-        "localfilters2": 32
+        "local_lr": 0.0011240040859781546,
+        "local_weight_decay": 0.013612994981628875,
+        "localdropout": 0.5069636746579309,
+        "localhiddenunits1": 512,
+        "localfilters1": 64,
+        "localfilters2": 64
     },
     "moe": {
         "moe_epochs": 200,
-        "moe_lr": 0.00006860953017421962,
-        "gatedropout": 0.22208172112474764,
-        "gatehiddenunits1": 256,
-        "gatehiddenunits2": 512,
-        "gatefilters1": 16,
-        "gatefilters2": 32,
-        "gate_weight_decay": 0.01386947012725592
+        "moe_lr": 0.00029116681140279395,
+        "gatedropout": 0.702904178228859,
+        "gatehiddenunits1": 128,
+        "gatehiddenunits2": 128,
+        "gatefilters1": 32,
+        "gatefilters2": 16,
+        "gate_weight_decay": 0.0004935538567704446
     }
 }
 

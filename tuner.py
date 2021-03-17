@@ -96,54 +96,54 @@ if __name__ == "__main__":
     for filename in args.filename:
         best_trial = None
         tune_configs = [
-            {
-                "local_lr": tune.loguniform(1e-5, 1e-1),
-                "local_weight_decay": tune.loguniform(1e-4, 1e-1),
-                "localdropout": tune.uniform(0.2, 0.8),
-                "localhiddenunits1": tune.choice([128, 256, 512]),
-                "localfilters1": tune.choice([16, 32, 64]),
-                "localfilters2": tune.choice([16, 32, 64]),
-                "config_filename": os.path.join(os.getcwd(), filename),
-                "epochs": 2,  # turn off FL
-                "loc_epochs": 200,
-                "moe_epochs": 2,
-                "num_clients": 5,
-                "part": "local"
-            },
-            {
-                "lr": tune.loguniform(1e-5, 1e-1),
-                "explore_strategy": "eps",
-                "fldropout": tune.uniform(0.2, 0.8),
-                "flhiddenunits1": tune.choice([128, 256, 512]),
-                "flfilters1": tune.choice([16, 32, 64]),
-                "flfilters2": tune.choice([16, 32, 64]),
-                "fl_weight_decay": tune.loguniform(1e-4, 1e-1),
-                "eps": tune.uniform(0, 0.5),
-                #  "local_ep": tune.choice([3, 5]),
-                #  "local_bs": tune.choice([5, 10]),
-                "config_filename": os.path.join(os.getcwd(), filename),
-                "epochs": 100,
-                "loc_epochs": 2,
-                "moe_epochs": 2,
-                "num_clients": 20,
-                "frac": 1.0,
-                "part": "fl",
-                "clusters": 2
-            },
+            # {
+            #     "local_lr": tune.loguniform(1e-5, 1e-1),
+            #     "local_weight_decay": tune.loguniform(1e-4, 1e-1),
+            #     "localdropout": tune.uniform(0.2, 0.8),
+            #     #"localhiddenunits1": tune.choice([128, 256, 512, 1024, 2048]),
+            #     #"localfilters1": tune.choice([16, 32, 64]),
+            #     #"localfilters2": tune.choice([16, 32, 64]),
+            #     "config_filename": os.path.join(os.getcwd(), filename),
+            #     "epochs": 2,  # turn off FL
+            #     "loc_epochs": 200,
+            #     "moe_epochs": 2,
+            #     "num_clients": 20,
+            #     "part": "local"
+            # },
+            # {
+            #     "lr": tune.loguniform(1e-5, 1e-1),
+            #     "explore_strategy": "eps",
+            #     "fldropout": tune.uniform(0.2, 0.8),
+            #     #"flhiddenunits1": tune.choice([128, 256, 512, 1024, 2048]),
+            #     #"flfilters1": tune.choice([16, 32, 64]),
+            #     #"flfilters2": tune.choice([16, 32, 64]),
+            #     "fl_weight_decay": tune.loguniform(1e-4, 1e-1),
+            #     "eps": tune.uniform(0, 0.4),
+            #     #  "local_ep": tune.choice([3, 5]),
+            #     #  "local_bs": tune.choice([5, 10]),
+            #     "config_filename": os.path.join(os.getcwd(), filename),
+            #     "epochs": 100,
+            #     "loc_epochs": 2,
+            #     "moe_epochs": 2,
+            #     "num_clients": 50,
+            #     "frac": 0.25,
+            #     "part": "fl",
+            #     "clusters": 1
+            # },
             {
                 "moe_lr": tune.loguniform(1e-5, 1e-1),
                 "gatedropout": tune.uniform(0.2, 0.8),
-                "gatehiddenunits1": tune.choice([128, 256, 512]),
-                "gatehiddenunits2": tune.choice([128, 256, 512]),
+                "gatehiddenunits1": tune.choice([128, 256, 512, 1024]),
+                "gatehiddenunits2": tune.choice([128, 256, 512, 1024]),
                 "gatefilters1": tune.choice([16, 32, 64]),
                 "gatefilters2": tune.choice([16, 32, 64]),
                 "gate_weight_decay": tune.loguniform(1e-4, 1e-1),
                 "config_filename": os.path.join(os.getcwd(), filename),
-                "epochs": 200,
+                "epochs": 100,
                 "loc_epochs": 200,
                 "moe_epochs": 200,
-                "num_clients": 20,
-                "frac": 1.0,
+                "num_clients": 50,
+                "frac": 0.25,
                 "part": "moe"
             }]
 
@@ -151,13 +151,15 @@ if __name__ == "__main__":
 
         for tc in tune_configs:
 
+            #ray.init()
+
             os.environ["CUDA_VISIBLE_DEVICES"]=",".join(map(str,get_available_gpus()))
             logger.debug(f"CUDA_VISIBLE_DEVICES: {os.environ['CUDA_VISIBLE_DEVICES']}")
 
             # Update the config with the best settings from the last search.
             if best_trial:
                 btc = best_trial.config
-                entries_to_remove = ["epochs", "loc_epochs", "moe_epochs", "part"]
+                entries_to_remove = ["epochs", "loc_epochs", "moe_epochs", "part", "num_clients", "frac"]
                 for k in entries_to_remove:
                     btc.pop(k, None)
                 tc.update(btc)
@@ -165,7 +167,7 @@ if __name__ == "__main__":
             hyperopt = HyperOptSearch(metric="accuracy", mode="max")
             result = tune.run(
                 train,
-                resources_per_trial={"cpu": 1, "gpu": 0.2},
+                resources_per_trial={"cpu": 2, "gpu": 0.25},
                 search_alg=hyperopt,
                 config=tc,
                 num_samples=args.num_samples,
@@ -177,5 +179,7 @@ if __name__ == "__main__":
                 best_trial.last_result["accuracy"]))
 
             best_trial_configs.append(best_trial.config)
+
+            #ray.stop()
 
         logger.info(best_trial_configs)

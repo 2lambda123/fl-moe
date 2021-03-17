@@ -68,7 +68,7 @@ if __name__ == "__main__":
             raw_clusters = np.array(args.j)
 
         for run in range(args.runs):
-            for strategy in ["none", "eps", "eps_decay_k"]:
+            for strategy in ["none","eps"]:
                 for clusters in np.array_split(raw_clusters, args.splits):
 
                     if len(clusters) == 1:

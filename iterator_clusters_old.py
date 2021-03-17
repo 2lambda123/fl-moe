@@ -75,8 +75,8 @@ if __name__ == "__main__":
         config["federated"]["explore_strategy"] = args.explore_strategy
         mylogger.debug("Explore strategy: {}".format(config["federated"]["explore_strategy"]))
 
-        if config["federated"]["explore_strategy"] == "eps":
-            config["federated"]["eps"] = 0.1
+        if config["federated"]["explore_strategy"] == "eps_decay_k":
+            config["federated"]["eps"] = 1.0
 
         frac = config["federated"]["frac"]
         mylogger.info(f"Starting {experiment_name} from {filename} with p={pvals}")
