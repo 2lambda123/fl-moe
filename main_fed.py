@@ -49,16 +49,23 @@ def weights_init(m):
         # torch.nn.init.xavier_uniform(m.weight)
         m.bias.data.fill_(0.01)
 
+
 def do_explore(iteration, args):
 
     if args.explore_strategy == "eps":
         return np.random.random() < args.eps
-    elif args.explore_strategy == "eps_decay":
+
+    if args.explore_strategy == "eps_decay":
         return np.random.random() < 1.0 / (iteration + 1)
-    elif args.explore_strategy == "eps_decay_k":
+
+    if args.explore_strategy == "eps_decay_b":
+        b = -np.log(args.eps) / np.log((args.epochs / 8) + 1)
+        return np.random.random() < 1.0 / ((iteration + 1)**b)
+
+    if args.explore_strategy == "eps_decay_k":
         return np.random.random() < 1.0 / ((iteration + 1)**(2 / args.clusters))
-    else:
-        return False
+    return False
+
 
 def main(args):
 
@@ -95,36 +102,56 @@ def main(args):
          transforms.Normalize(
             mean=(0.4915, 0.4822, 0.4466),
             std=(0.2470, 0.2435, 0.2616))
-        ])
-
-    trans_cifar10_train = transforms.Compose(
-                [
-                 transforms.RandomCrop(size=32, padding=4),
-                 transforms.ColorJitter(brightness=.4, contrast=.4, saturation=.4, hue=.4),
-                 transforms.RandomHorizontalFlip(),
-                 transforms.ToTensor(),
-                 transforms.Normalize(
-                    mean=(0.4915, 0.4822, 0.4466),
-                    std=(0.2470, 0.2435, 0.2616))
-                ])
+         ])
 
     trans_cifar100_test = transforms.Compose(
         [transforms.ToTensor(),
          transforms.Normalize(
             mean=(0.4915, 0.4822, 0.4466),
             std=(0.2470, 0.2435, 0.2616))
-        ])
+         ])
 
-    trans_cifar100_train = transforms.Compose(
-                [
-                 transforms.RandomCrop(size=32, padding=4),
-                 transforms.ColorJitter(brightness=.4, contrast=.4, saturation=.4, hue=.4),
-                 transforms.RandomHorizontalFlip(),
-                 transforms.ToTensor(),
-                 transforms.Normalize(
+    if args.dataaugmentation:
+        trans_cifar10_train = transforms.Compose(
+            [
+                transforms.RandomCrop(size=32, padding=4),
+                transforms.ColorJitter(
+                    brightness=.4, contrast=.4, saturation=.4, hue=.4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(
                     mean=(0.4915, 0.4822, 0.4466),
                     std=(0.2470, 0.2435, 0.2616))
-                ])
+            ])
+
+        trans_cifar100_train = transforms.Compose(
+        [
+            transforms.RandomCrop(size=32, padding=4),
+            transforms.ColorJitter(
+                brightness=.4, contrast=.4, saturation=.4, hue=.4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=(0.4915, 0.4822, 0.4466),
+                std=(0.2470, 0.2435, 0.2616))
+        ])
+
+    else:
+        trans_cifar10_train = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=(0.4915, 0.4822, 0.4466),
+                    std=(0.2470, 0.2435, 0.2616))
+            ])
+
+        trans_cifar100_train = transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=(0.4915, 0.4822, 0.4466),
+                std=(0.2470, 0.2435, 0.2616))
+        ])
 
     # TODO: print warnings if arguments are not used (p, overlap)
     for run in range(args.runs):
@@ -191,20 +218,19 @@ def main(args):
 
             from Cifar10RotatedDataset import Cifar10RotatedDataset
 
-
             with tempfile.TemporaryDirectory() as tmpdirname:
 
                 dataset_train = Cifar10RotatedDataset(
                     tmpdirname, train=True,
                     download=True, transform=trans_cifar10_train,
-                    num_clients = args.num_clients,
+                    num_clients=args.num_clients,
                     n_data=args.n_data)
 
                 dataset_test = Cifar10RotatedDataset(
                     tmpdirname, train=False,
                     download=True, transform=trans_cifar10_test,
-                    num_clients = args.num_clients,
-                    n_data = args.n_data_test)
+                    num_clients=args.num_clients,
+                    n_data=args.n_data_test)
 
             dict_users = dataset_train.dict_users
             dict_users_test = dataset_test.dict_users
@@ -247,9 +273,9 @@ def main(args):
             mylogger.error("Dataset not available")
             raise SystemExit(3)
 
-        train_lengths = [len(v) for k,v  in dict_users.items()]
+        train_lengths = [len(v) for k, v in dict_users.items()]
         mylogger.debug(f"Training samples: {train_lengths}")
-        test_lengths = [len(v) for k,v  in dict_users_test.items()]
+        test_lengths = [len(v) for k, v in dict_users_test.items()]
         mylogger.debug(f"Test samples: {test_lengths}")
 
         img_size = dataset_train[0][0].shape
@@ -279,11 +305,13 @@ def main(args):
 
         elif args.model == 'leaf':
 
-            if "cifar10" in args.dataset :
+            if "cifar10" in args.dataset:
 
-                net_glob_fedAvg = CNNLeaf(args=args, model="fl").to(args.device)
+                net_glob_fedAvg = CNNLeaf(
+                    args=args, model="fl").to(args.device)
                 gates_e2e_model = GateCNNLeaf(args=args).to(args.device)
-                net_locals_model = CNNLeaf(args=args, model="local").to(args.device)
+                net_locals_model = CNNLeaf(
+                    args=args, model="local").to(args.device)
 
             elif "mnist" in args.dataset:
 
@@ -293,11 +321,13 @@ def main(args):
 
         elif args.model == 'ifca':
 
-            if "cifar10" in args.dataset :
+            if "cifar10" in args.dataset:
 
-                net_glob_fedAvg = CNNIFCA(args=args, model="fl").to(args.device)
+                net_glob_fedAvg = CNNIFCA(
+                    args=args, model="fl").to(args.device)
                 gates_e2e_model = GateCNNLeaf(args=args).to(args.device)
-                net_locals_model = CNNIFCA(args=args, model="local").to(args.device)
+                net_locals_model = CNNIFCA(
+                    args=args, model="local").to(args.device)
 
             else:
 
@@ -613,8 +643,11 @@ def main(args):
             c_indicies = np.where(
                 cluster_train_loss == np.nanmin(cluster_train_loss))
 
-            # Pick one on randoms if multiple
-            c_idx = np.random.choice(c_indicies[0], 1)[0]
+            # Pick one on random if multiple
+            try:
+                c_idx = np.random.choice(c_indicies[0], 1)[0]
+            except ValueError:
+                c_idx = np.random.randint(args.clusters)
 
             cluster_use[c_idx] += 1
 
@@ -704,7 +737,7 @@ def main(args):
                 mylogger.debug(f"Validating ensembles for client {idx}")
 
                 nets = [copy.deepcopy(net_clusters[c]).to(args.device)
-                       for c in range(args.clusters) if cluster_use[c] > 0]
+                        for c in range(args.clusters) if cluster_use[c] > 0]
 
                 if args.train_local:
                     nets += [net_locals[idx].to(args.device)]
@@ -771,7 +804,7 @@ def main(args):
             json.dump(client_results, outfile)
 
         # TODO: Make experiment directories
-        with open(f'save/{args.experiment}/{filename}.csv', 'a') as f1:
+        with open(f'save/{args.experiment}/{myid}_{filename}.csv', 'a') as f1:
             f1.write('{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{}'.format(
                 myid,
                 args.dataset, args.model, args.epochs, args.local_ep,
@@ -793,7 +826,6 @@ def main(args):
                 w.close()
 
     return val_acc_avg_locals, val_acc_avg_fedavg, val_acc_avg_e2e
-
 
 
 if __name__ == '__main__':
