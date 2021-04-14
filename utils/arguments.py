@@ -62,6 +62,7 @@ def args_parser():
     parser.add_argument('--opt', type=float, default=0.5, help='fraction of clients that opt-in (default: 0.5)')
     parser.add_argument('--p', type=float, default = 0.3, help='majority class percentage (default: 0.3)')
     parser.add_argument('--finetuning', action='store_true', help='whether to train finetuned models or not')
+    parser.add_argument('--dataaugmentation', action='store_true', help='whether to train using data augmention or not')
     parser.add_argument('--ensembles', action='store_true', help='whether to train ensemble models or not')
     parser.add_argument('--tensorboard', action='store_true', help='output tensorboard logs')
     parser.add_argument('--train_local', action='store_true', help='train local models')
