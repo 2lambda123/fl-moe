@@ -156,29 +156,33 @@ class GateCNNFEMNIST(nn.Module):
     def __init__(self, args, nomodels=None):
         super().__init__()
 
+        self.gatehiddenunits1 = args.gatehiddenunits1
+        self.gatefilters1 = args.gatefilters1
+        self.gatefilters2 = args.gatefilters2
+        self.gatedropout = args.gatedropout
         self.nomodels = args.clusters + 1
 
         if nomodels:
             self.nomodels = nomodels
 
-        self.conv1 = nn.Conv2d(1, 32, 5)
+        self.conv1 = nn.Conv2d(1, self.gatefilters1, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(32, 64, 5)
-        self.fc1 = nn.Linear(64 * 4 * 4, 512)
+        self.conv2 = nn.Conv2d(self.gatefilters1, self.gatefilters2, 5)
+        self.fc1 = nn.Linear(self.gatefilters2 * 4 * 4, self.gatehiddenunits1)
         self.dropout = nn.Dropout()
 
         if self.nomodels <= 2:
-            self.fc2 = nn.Linear(512, 1)
+            self.fc2 = nn.Linear(self.gatehiddenunits1, 1)
             self.activation = nn.Sigmoid()
         else:
-            self.fc2 = nn.Linear(512, self.nomodels)
+            self.fc2 = nn.Linear(self.gatehiddenunits1, self.nomodels)
             self.activation = nn.Softmax()
 
     def forward(self, x):
 
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 64 * 4 * 4)
+        x = x.view(-1, self.gatefilters2 * 4 * 4)
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
         x = F.relu(self.fc2(x))
