@@ -5,6 +5,7 @@ def args_parser():
     # federated arguments
     parser.add_argument('--epochs', type=int, default=10, help="global epochs")
     parser.add_argument('--num_clients', type=int, default=100, help="number of clients")
+    parser.add_argument('--eval_num_clients', type=int, default=10, help="number of clients to evaluate on")
     parser.add_argument('--frac', type=float, default=0.1, help="the fraction of clients")
     parser.add_argument('--local_ep', type=int, default=5, help="the number of local epochs for FL")
     parser.add_argument('--local_bs', type=int, default=10, help="local batch size")

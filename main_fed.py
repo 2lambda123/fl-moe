@@ -64,6 +64,7 @@ def do_explore(iteration, args):
 
     if args.explore_strategy == "eps_decay_k":
         return np.random.random() < 1.0 / ((iteration + 1)**(2 / args.clusters))
+
     return False
 
 
@@ -90,7 +91,7 @@ def main(args):
               "acc_test_mix", "acc_test_locals", "acc_test_fedavg",
               "ft_test_acc", "ft_train_acc", "train_acc_avg_locals",
               "val_acc_gateonly", "overlap", "run", "clusters", "eps",
-              "explore_strategy"]
+              "explore_strategy", "best_iteration"]
 
     if not filexist:
         with open(f"save/{args.experiment}/{myid}_{filename}.csv", 'a') as f1:
@@ -390,6 +391,13 @@ def main(args):
         else:
             tb_writers = [None for c in range(args.clusters)]
 
+        patience = 10
+        cluster_counter = [0]*args.clusters
+        cluster_val_loss_best = [np.inf]*args.clusters
+        w_fedAvg_best = {}
+        cluster_model_max_iteration = [0] * args.clusters
+        best_iteration = args.epochs
+
         for iteration in range(args.epochs):
             mylogger.info(f"Round {iteration}")
 
@@ -480,36 +488,30 @@ def main(args):
                     alpha[c_idx].append(
                         len(dict_users[idx]) / len(dataset_train))
 
-                    # val_acc_fed, val_loss_fed = client.validate(
-                    #     net=copy.deepcopy(
-                    #         net_glob_fedAvg).to(args. device))
+                # Don't evaluate every iteration
+                if iteration % 10 == 0:
 
-                    # # TODO: Add training accuracy
-                    # with open('save/training' + filename, 'a') as f1:
-                    #     f1.write(f"{iteration};{idx};{train_loss_fed};{val_acc_fed};{val_loss_fed}")
-                    #     f1.write("\n")
+                    # Get the loss from the validation set.
+                    val_acc_fed, val_loss_fed = client.validate(
+                        net=copy.deepcopy(
+                            net_clusters[c_idx]).to(args. device),
+                        train=False)
 
-                # mylogger.debug(f"FL-training;{idx};{train_loss_fed};{val_acc_fed}{val_loss_fed}")
-
-                # Get the loss from the validation set.
-                val_acc_fed, val_loss_fed = client.validate(
-                    net=copy.deepcopy(
-                        net_clusters[c_idx]).to(args. device),
-                    train=False)
-
-                cluster_val_loss[c_idx].append(val_loss_fed)
-                cluster_val_acc[c_idx].append(val_acc_fed)
+                    cluster_val_loss[c_idx].append(val_loss_fed)
+                    cluster_val_acc[c_idx].append(val_acc_fed)
 
             # update global model weights
             for c in range(args.clusters):
 
-                if tb_writers[c]:
-                    tb_writers[c].add_scalar('fl training loss', np.mean(
-                        cluster_train_loss[c]), iteration)
-                    tb_writers[c].add_scalar('fl validation loss', np.mean(
-                        cluster_val_loss[c]), iteration)
-                    tb_writers[c].add_scalar(
-                        'fl number of clients', cluster_clients[c], iteration)
+                if iteration % 10 == 0:
+
+                    if tb_writers[c]:
+                        tb_writers[c].add_scalar('fl training loss', np.mean(
+                            cluster_train_loss[c]), iteration)
+                        tb_writers[c].add_scalar('fl validation loss', np.mean(
+                            cluster_val_loss[c]), iteration)
+                        tb_writers[c].add_scalar(
+                            'fl number of clients', cluster_clients[c], iteration)
 
                 if not w_fedAvg[c]:
                     mylogger.warning(f"Empty FL gradient list for cluster {c} in round {iteration}.")
@@ -518,6 +520,27 @@ def main(args):
 
                     # copy weight to net_glob
                     net_clusters[c].load_state_dict(w_glob_fedAvg)
+
+                if iteration % 10 == 0:
+
+                    if np.mean(cluster_val_loss[c]) < cluster_val_loss_best[c]:
+                        cluster_counter[c] = 0
+                        cluster_val_loss_best[c] = np.mean(cluster_val_loss[c])
+                        w_fedAvg_best[c] = w_glob_fedAvg
+                        cluster_model_max_iteration[c] = iteration
+
+                    else:
+                        cluster_counter[c] += 1
+
+            if np.min(cluster_counter) >= patience:
+                mylogger.info(f"Early stopping triggered in FL iteration {iteration}.")
+                best_iteration = iteration
+                break
+
+        # Setting cluster models to best models found
+        for c in range(args.clusters):
+            if c in w_fedAvg_best:
+                net_clusters[c].load_state_dict(w_fedAvg_best[c])
 
         # Initialize user result dictionary
         client_results = {idx: {} for idx in range(args.num_clients)}
@@ -566,7 +589,7 @@ def main(args):
                 c_idx = np.random.choice(c_indicies[0], 1)[0]
 
                 # TODO: Remove magical constants
-                wt, _, val_acc_finetuned, train_acc_finetuned = client.train_finetune(
+                wt, _, val_acc_finetuned, train_acc_finetuned, best_epoch = client.train_finetune(
                     net=copy.deepcopy(net_clusters[c_idx]).to(args.device),
                     n_epochs=args.loc_epochs,
                     learning_rate=args.ft_lr)
@@ -574,7 +597,8 @@ def main(args):
                 client_results[idx].update(
                     {"finetuning": {
                         "train": train_acc_finetuned,
-                        "validation": val_acc_finetuned
+                        "validation": val_acc_finetuned,
+                        "best_epoch": best_epoch
                     }})
 
                 val_acc_ft.append(val_acc_finetuned)
@@ -584,9 +608,15 @@ def main(args):
                 ft_net.load_state_dict(wt)
                 finetuned.append(ft_net)
 
+        # Evaluate on a smaller set of clients for speed
+        evaluation_set = np.random.choice(
+            range(args.eval_num_clients),
+            args.eval_num_clients,
+            replace=False)
+
         if args.train_local:
             mylogger.info("Starting training local models")
-            for idx in range(args.num_clients):
+            for idx in evaluation_set:
 
                 client = ClientUpdate(args=args,
                                       train_set=dataset_train,
@@ -599,7 +629,7 @@ def main(args):
                 # train local model
                 # TODO: Remove magical constants
                 mylogger.debug(f"Training local model for client {idx}")
-                w_l, _, val_acc_l, train_acc_l = client.train_finetune(
+                w_l, _, val_acc_l, train_acc_l, best_epoch = client.train_finetune(
                     net=net_locals[idx].to(args.device),
                     n_epochs=args.loc_epochs,
                     learning_rate=args.local_lr)
@@ -607,7 +637,8 @@ def main(args):
                 client_results[idx].update(
                     {"local": {
                         "train": train_acc_l,
-                        "validation": val_acc_l
+                        "validation": val_acc_l,
+                        "best_epoch": best_epoch
                     }})
 
                 net_locals[idx].load_state_dict(w_l)
@@ -619,7 +650,8 @@ def main(args):
 
         cluster_use = [0 for x in range(args.clusters)]
 
-        for idx in range(args.num_clients):
+        # Bootstrap
+        for idx in evaluation_set:
 
             client = ClientUpdate(args=args,
                                   train_set=dataset_train,
@@ -655,11 +687,14 @@ def main(args):
             cluster_val_acc, _ = client.validate(
                 net=net_clusters[c_idx].to(args.device), train=False)
 
+            mylogger.debug(f"Client {idx} cluster {c_idx}, accuracy {cluster_val_acc}")
+
             client_results[idx].update(
                 {"fedavg": {
                     "train": np.nan,
                     "validation": np.max(cluster_val_acc),
-                    "cluster": int(c_idx)
+                    "cluster": int(c_idx),
+                    "iteration": cluster_model_max_iteration[c_idx]
                 }})
 
             val_acc_fedavg.append(np.max(cluster_val_acc))
@@ -672,7 +707,7 @@ def main(args):
 
         mylogger.info("Starting MoE trainings")
         # TODO: Add each cluster model
-        for idx in range(args.num_clients):
+        for idx in evaluation_set:
 
             mylogger.debug(f"Training mixtures for client {idx}")
 
@@ -704,7 +739,7 @@ def main(args):
 
             gates_e2e[idx].apply(weights_init)
 
-            _, _, val_acc_e2e_k, _ = client.train_3(
+            _, _, val_acc_e2e_k, gate_values, best_epoch = client.train_3(
                 nets=nets,
                 gate=copy.deepcopy(gates_e2e[idx]),
                 train_gate_only=args.train_gate_only,
@@ -716,7 +751,9 @@ def main(args):
             client_results[idx].update(
                 {"mixtures": {
                     "train": np.nan,
-                    "validation": val_acc_e2e_k
+                    "validation": val_acc_e2e_k,
+                    "best_epoch": best_epoch,
+                    "gate_values": list(gate_values.size())
                 }})
 
             val_acc_e2e.append(val_acc_e2e_k)
@@ -724,7 +761,7 @@ def main(args):
         if args.ensembles:
 
             mylogger.info("Starting Ensemble trainings")
-            for idx in range(args.num_clients):
+            for idx in evaluation_set:
 
                 client = ClientUpdate(args=args,
                                       train_set=dataset_train,
@@ -748,6 +785,8 @@ def main(args):
                 val_acc_ensemble_k, val_loss_ensemble_k = client.validate(
                     ensemble_model)
 
+                mylogger.debug(f"Client {idx} ensemble accuracy {val_acc_ensemble_k}")
+
                 client_results[idx].update(
                     {"ensemble": {
                         "train": np.nan,
@@ -757,7 +796,6 @@ def main(args):
                 val_acc_ensemble.append(val_acc_ensemble_k)
 
         # Calculate validation and test accuracies
-
         if args.train_local:
             val_acc_avg_locals = np.mean(val_acc_locals)
             train_acc_avg_locals = np.mean(train_acc_locals)
@@ -805,7 +843,7 @@ def main(args):
 
         # TODO: Make experiment directories
         with open(f'save/{args.experiment}/{myid}_{filename}.csv', 'a') as f1:
-            f1.write('{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{}'.format(
+            f1.write('{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{};{}'.format(
                 myid,
                 args.dataset, args.model, args.epochs, args.local_ep,
                 args.num_clients, args.iid, args.p, args.opt, args.n_data,
@@ -817,7 +855,7 @@ def main(args):
                 acc_test_mix, acc_test_locals, acc_test_fedavg, ft_test_acc,
                 ft_train_acc, train_acc_avg_locals,
                 val_acc_avg_gateonly, args.overlap, run, args.clusters,
-                args.eps, args.explore_strategy))
+                args.eps, args.explore_strategy, best_iteration))
             f1.write("\n")
         mylogger.info("Done")
 

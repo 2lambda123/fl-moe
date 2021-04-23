@@ -37,6 +37,7 @@ class ClientUpdate(object):
         self.client_id = client_id
 
         self.args = args
+
         self.loss_func = nn.NLLLoss()
 
         self.lr = 1e-5
@@ -81,10 +82,13 @@ class ClientUpdate(object):
         net.train()
         # train and update
         lr0 = self.lr_decay(0, self.lr, self.lr / 100.0)
+
         optimizer = torch.optim.SGD(net.parameters(), lr=self.lr,
                                      weight_decay=weight_decay)
+
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
                     lr_lambda=lambda step: self.lr_decay(step, self.lr, self.lr / 100.0) / lr0)
+
         epoch_loss = np.inf
 
         for epoch in range(n_epochs):
@@ -129,7 +133,7 @@ class ClientUpdate(object):
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
                                                       lr_lambda=lambda step: self.lr_decay(step, learning_rate, learning_rate / 100.0) / lr0)
 
-        patience = 4
+        patience = 10
         epoch_loss = []
         epoch_train_accuracy = []
         model_best = net.state_dict()
@@ -137,6 +141,8 @@ class ClientUpdate(object):
         val_acc_best = -np.inf
         val_loss_best = np.inf
         counter = 0
+        best_epoch = 0
+
         for epoch in range(n_epochs):
             net.train()
             batch_loss = []
@@ -181,15 +187,16 @@ class ClientUpdate(object):
                     val_acc_best = val_acc
                     val_loss_best = val_loss
                     train_acc_best = train_accuracy
+                    best_epoch = epoch
                     self.logger.debug(f"Finetuning Iter {epoch} | {val_acc_best:.2f}")
                 else:
                     counter = counter + 1
 
                 # Takes 50 iterations!
                 if counter == patience:
-                    return model_best, epoch_loss[-1], val_acc_best, train_acc_best
+                    return model_best, epoch_loss[-1], val_acc_best, train_acc_best, best_epoch
 
-        return model_best, epoch_loss[-1], val_acc_best, train_acc_best
+        return model_best, epoch_loss[-1], val_acc_best, train_acc_best, best_epoch
 
     def train_mix(self, net_local, net_global, gate, train_gate_only, n_epochs, early_stop, learning_rate):
         """
@@ -206,13 +213,14 @@ class ClientUpdate(object):
             optimizer = torch.optim.Adam(list(net_local.parameters(
             )) + list(gate.parameters()) + list(net_global.parameters()), lr=learning_rate)
 
-        patience = 4
+        patience = 10
         epoch_loss = []
         gate_best = gate.state_dict()
         val_acc_best = -np.inf
         val_loss_best = np.inf
         counter = 0
         gate_values_best = 0
+        best_epoch = 0
         for epoch in range(n_epochs):
 
             net_local.train()
@@ -255,6 +263,7 @@ class ClientUpdate(object):
                         val_acc_best = val_acc
                         val_loss_best = val_loss
                         gate_values_best = gate_values
+                        best_epoch = epoch
                         self.logger.debug(f"MoE Iter {epoch} | {val_acc_best:.2f}")
                     else:
                         counter = counter + 1
@@ -268,9 +277,9 @@ class ClientUpdate(object):
 
                     if counter == patience:
                         return gate_best, this_epoch_loss, \
-                            val_acc_best, gate_values_best
+                            val_acc_best, gate_values_best, best_epoch
 
-        return gate_best, this_epoch_loss, val_acc_best, gate_values_best
+        return gate_best, this_epoch_loss, val_acc_best, gate_values_best, best_epoch
 
     # def train_rep(self, net_local, net_global, gate, train_gate_only, n_epochs, early_stop):
     #     net_local.train()
@@ -352,14 +361,15 @@ class ClientUpdate(object):
         #scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
         #                                              lr_lambda=lambda step: self.lr_decay(step, learning_rate, learning_rate / 100.0) / lr0)
 
-        patience = 4
+        patience = 10
         #epoch_loss = []
 
         gate_best = gate.state_dict()
         val_acc_best = -np.inf
         val_loss_best = np.inf
         counter = 0
-        gate_values_best = 0
+        gate_values_best = None
+        best_epoch = 0
 
         for epoch in range(n_epochs):
 
@@ -425,7 +435,7 @@ class ClientUpdate(object):
 
             if(early_stop):
                 if(epoch % 5 == 0):
-                    val_acc, val_loss = self.validate_3(nets, gate)
+                    val_acc, val_loss, gate_values = self.validate_3(nets, gate)
 
                     if self.writer:
                         self.writer.add_scalar(
@@ -438,15 +448,18 @@ class ClientUpdate(object):
                         gate_best = gate.state_dict()
                         val_acc_best = val_acc
                         val_loss_best = val_loss
+                        gate_values_best = gate_values
+                        best_epoch = epoch
+
                         self.logger.debug("Iter %d | %.2f" %
                                           (epoch, val_acc_best))
                     else:
                         counter = counter + 1
 
                     if counter == patience:
-                        return gate_best, this_epoch_loss, val_acc_best, gate_values_best
+                        return gate_best, this_epoch_loss, val_acc_best, gate_values_best, best_epoch
 
-        return gate_best, this_epoch_loss, val_acc_best, gate_values_best
+        return gate_best, this_epoch_loss, val_acc_best, gate_values_best, best_epoch
 
     def validate(self, net, train=False):
         with torch.no_grad():
@@ -558,7 +571,7 @@ class ClientUpdate(object):
             val_loss /= len(self.ldr_val.dataset)
             accuracy = 100.00 * correct / len(self.ldr_val.dataset)
             #gl_values = np.concatenate((gate_values.reshape(-1,1), label_values.reshape(-1,1)),axis=1)
-            return accuracy.item(), val_loss
+            return accuracy.item(), val_loss, gate_weight
 
     # def validate_rep(self, net_l, net_g, gate):
     #     with torch.no_grad():
