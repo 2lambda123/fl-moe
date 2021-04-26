@@ -126,16 +126,16 @@ def main(args):
             ])
 
         trans_cifar100_train = transforms.Compose(
-        [
-            transforms.RandomCrop(size=32, padding=4),
-            transforms.ColorJitter(
-                brightness=.4, contrast=.4, saturation=.4, hue=.4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=(0.4915, 0.4822, 0.4466),
-                std=(0.2470, 0.2435, 0.2616))
-        ])
+            [
+                transforms.RandomCrop(size=32, padding=4),
+                transforms.ColorJitter(
+                    brightness=.4, contrast=.4, saturation=.4, hue=.4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=(0.4915, 0.4822, 0.4466),
+                    std=(0.2470, 0.2435, 0.2616))
+            ])
 
     else:
         trans_cifar10_train = transforms.Compose(
@@ -147,12 +147,12 @@ def main(args):
             ])
 
         trans_cifar100_train = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=(0.4915, 0.4822, 0.4466),
-                std=(0.2470, 0.2435, 0.2616))
-        ])
+            [
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=(0.4915, 0.4822, 0.4466),
+                    std=(0.2470, 0.2435, 0.2616))
+            ])
 
     # TODO: print warnings if arguments are not used (p, overlap)
     for run in range(args.runs):
