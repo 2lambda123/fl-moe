@@ -457,7 +457,7 @@ def main(args):
                         else:
                             # Returns all indicies
                             c_indicies = np.where(
-                                c_loss == np.min(c_loss))
+                                c_loss == np.nanmin(c_loss))
 
                             # If more than one, pick one on random
                             try:
