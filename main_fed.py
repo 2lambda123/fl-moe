@@ -687,7 +687,7 @@ def main(args):
             cluster_val_acc, _ = client.validate(
                 net=net_clusters[c_idx].to(args.device), train=False)
 
-            mylogger.debug(f"Client {idx} cluster {c_idx}, accuracy {cluster_val_acc}")
+            mylogger.debug(f"Client {idx} cluster {c_idx}, accuracy {cluster_val_acc:.2f}")
 
             client_results[idx].update(
                 {"fedavg": {
@@ -699,14 +699,57 @@ def main(args):
 
             val_acc_fedavg.append(np.max(cluster_val_acc))
 
-        # TODO: Add to output somehow.
         for c in range(args.clusters):
             mylogger.debug(f"Cluster {c} model is used {cluster_use[c]} times.")
             if cluster_use[c] == 0:
                 mylogger.warning(f"Cluster {c} model is never used.")
 
+        if args.ensembles:
+
+            mylogger.info("Starting Ensemble validation")
+            for idx in evaluation_set:
+
+                client = ClientUpdate(args=args,
+                                      train_set=dataset_train,
+                                      val_set=dataset_test,
+                                      idxs_train=dict_users[idx],
+                                      idxs_val=dict_users_test[idx],
+                                      parent_id=myid,
+                                      client_id=idx)
+
+                # mylogger.debug(f"Validating ensembles for client {idx}")
+
+                # TODO: Increases memory use
+                nets = [copy.deepcopy(net_clusters[c]).to(args.device)
+                        for c in range(args.clusters) if cluster_use[c] > 0]
+
+                if args.train_local:
+                    nets += [copy.deepcopy(net_locals[idx]).to(args.device)]
+
+                # TODO: This now only works on Cifar 10 :)
+                ensemble_model = MyEnsemble(nets)
+
+                val_acc_ensemble_k, _ = client.validate(ensemble_model)
+
+                mylogger.debug(f"Client {idx} ensemble accuracy {val_acc_ensemble_k:.2f}")
+
+                client_results[idx].update(
+                    {"ensemble": {
+                        "train": np.nan,
+                        "validation": val_acc_ensemble_k
+                    }})
+
+                val_acc_ensemble.append(val_acc_ensemble_k)
+
+            val_acc_avg_ensemble = np.mean(val_acc_ensemble)
+            mylogger.info(f"Client average ensemble accuracy {val_acc_avg_ensemble:.2f}")
+
         mylogger.info("Starting MoE trainings")
+
         # TODO: Add each cluster model
+        # TODO: Save local models to disk and load them when needed to save memory
+        # or at least make only the ones in the evaluation set take up memory on the GPU.
+        # or move them to CPU when not needed on the GPU
         for idx in evaluation_set:
 
             mylogger.debug(f"Training mixtures for client {idx}")
@@ -720,12 +763,11 @@ def main(args):
                                   client_id=idx)
 
             # The mixture is trained over all (used) cluster models + the local model
-
             nets = [copy.deepcopy(net_clusters[c]).to(args.device)
                     for c in range(args.clusters) if cluster_use[c] > 0]
 
             if args.train_local:
-                nets += [net_locals[idx].to(args.device)]
+                nets += [copy.deepcopy(net_locals[idx]).to(args.device)]
 
             # TODO: FIX FIX FIX
             # Ugly hack when number of models is not the same as number of clusters
@@ -753,47 +795,13 @@ def main(args):
                     "train": np.nan,
                     "validation": val_acc_e2e_k,
                     "best_epoch": best_epoch,
-                    "gate_values": list(gate_values.size())
+                    "gate_values": np.nan
                 }})
 
             val_acc_e2e.append(val_acc_e2e_k)
 
-        if args.ensembles:
-
-            mylogger.info("Starting Ensemble trainings")
-            for idx in evaluation_set:
-
-                client = ClientUpdate(args=args,
-                                      train_set=dataset_train,
-                                      val_set=dataset_test,
-                                      idxs_train=dict_users[idx],
-                                      idxs_val=dict_users_test[idx],
-                                      parent_id=myid,
-                                      client_id=idx)
-
-                mylogger.debug(f"Validating ensembles for client {idx}")
-
-                nets = [copy.deepcopy(net_clusters[c]).to(args.device)
-                        for c in range(args.clusters) if cluster_use[c] > 0]
-
-                if args.train_local:
-                    nets += [net_locals[idx].to(args.device)]
-
-                # TODO: This now only works on Cifar 10 :)
-                ensemble_model = MyEnsemble(nets)
-
-                val_acc_ensemble_k, val_loss_ensemble_k = client.validate(
-                    ensemble_model)
-
-                mylogger.debug(f"Client {idx} ensemble accuracy {val_acc_ensemble_k}")
-
-                client_results[idx].update(
-                    {"ensemble": {
-                        "train": np.nan,
-                        "validation": val_acc_ensemble_k
-                    }})
-
-                val_acc_ensemble.append(val_acc_ensemble_k)
+        val_acc_avg_e2e = np.mean(val_acc_e2e)
+        mylogger.info(f"Client average MoE accuracy {val_acc_avg_e2e:.2f}")
 
         # Calculate validation and test accuracies
         if args.train_local:
@@ -803,13 +811,8 @@ def main(args):
             val_acc_avg_locals = np.nan
             train_acc_avg_locals = np.nan
 
-        val_acc_avg_e2e = np.mean(val_acc_e2e)
-        # val_acc_avg_e2e = np.nan
 
-        if args.ensembles:
-            val_acc_avg_ensemble = np.mean(val_acc_ensemble)
-        else:
-            val_acc_avg_ensemble = np.nan
+        # val_acc_avg_e2e = np.nan
 
         # val_acc_avg_e2e_neighbour = sum(val_acc_e2e_neighbour) / len(val_acc_e2e_neighbour)
         val_acc_avg_e2e_neighbour = np.nan
@@ -857,7 +860,7 @@ def main(args):
                 val_acc_avg_gateonly, args.overlap, run, args.clusters,
                 args.eps, args.explore_strategy, best_iteration))
             f1.write("\n")
-        mylogger.info("Done")
+        mylogger.info(f"Done: {val_acc_avg_fedavg}, {val_acc_avg_ensemble}, {val_acc_avg_e2e}, {val_acc_avg_locals}")
 
         for w in tb_writers:
             if w:
