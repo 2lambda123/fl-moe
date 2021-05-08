@@ -99,15 +99,16 @@ if __name__ == "__main__":
             # {
             #     "local_lr": tune.loguniform(1e-4, 1e-3),
             #     "local_weight_decay": tune.loguniform(1e-4, 1e-1),
-            #     "localdropout": tune.uniform(0.2, 0.8),
-            #     "localhiddenunits1": tune.choice([128, 256, 512, 1024, 2048]),
-            #     "localfilters1": tune.choice([32, 64, 128]),
-            #     "localfilters2": tune.choice([16, 32, 64]),
+            #     "localdropout": tune.uniform(0.5, 0.8),
+            #     "localhiddenunits1": tune.choice([128, 256, 512, 1024]),
+            #     "localfilters1": tune.choice([16, 32, 64]),
+            #     "localfilters2": tune.choice([32, 64, 128, 256]),
             #     "config_filename": os.path.join(os.getcwd(), filename),
             #     "epochs": 2,  # turn off FL
-            #     "loc_epochs": 200,
+            #     "loc_epochs": 400,
             #     "moe_epochs": 2,
             #     "num_clients": 50,
+            #     "eval_num_clients": 20,
             #     "part": "local"
             # },
             # {
@@ -122,7 +123,7 @@ if __name__ == "__main__":
             #     #  "local_ep": tune.choice([3, 5]),
             #     #  "local_bs": tune.choice([5, 10]),
             #     "config_filename": os.path.join(os.getcwd(), filename),
-            #     "epochs": 100,
+            #     "epochs": 500,
             #     "loc_epochs": 2,
             #     "moe_epochs": 2,
             #     # "num_clients": 24,
@@ -131,15 +132,15 @@ if __name__ == "__main__":
             #     "clusters": 1
             # },
             {
-                "moe_lr": tune.loguniform(1e-7, 1e-4),
-                "explore_strategy": "none",
+                "moe_lr": tune.loguniform(1e-7, 1e-3),
+                #"explore_strategy": "none",
                 "gatedropout": tune.uniform(0.2, 0.8),
-                "gatehiddenunits1": tune.choice([128, 256, 512, 1024, 2048]),
-                "clusters": 1,
-                #"gatehiddenunits2": tune.choice([128, 256, 512, 1024]),
-                "gatefilters1": tune.choice([16, 32, 64]),
-                "gatefilters2": tune.choice([16, 32, 64]),
-                "gate_weight_decay": tune.loguniform(1e-3, 1e-1),
+                "gatehiddenunits1": tune.choice([4, 8, 16, 32, 64]),
+                #"clusters": 1,
+                #"gatehiddenunits2": tune.choice([64, 128, 256, 512]),
+                "gatefilters1": tune.choice([2, 4, 6, 8, 12, 16]),
+                "gatefilters2": tune.choice([0, 2, 4, 6, 8, 12, 16]),
+                "gate_weight_decay": tune.loguniform(1e-4, 1e-1),
                 "config_filename": os.path.join(os.getcwd(), filename),
                 "epochs": 100,
                 "loc_epochs": 200,
@@ -147,15 +148,16 @@ if __name__ == "__main__":
                 # "num_clients": 50,
                 # "frac": 0.25,
                 "part": "moe"
-            },
-            {
-                "explore_strategy": "eps",
-                "config_filename": os.path.join(os.getcwd(), filename),
-                "eps": tune.uniform(0, 0.3),
-                "p": 0.9,
-                "clusters": 2,
-                "part": "moe"
             }
+            # ,
+            # {
+            #     "explore_strategy": "eps",
+            #     #"config_filename": os.path.join(os.getcwd(), filename),
+            #     "eps": tune.uniform(0, 0.3),
+            #     "p": 0.9,
+            #     "clusters": 2,
+            #     "part": "moe"
+            # }
         ]
 
         best_trial_configs = []
@@ -177,10 +179,23 @@ if __name__ == "__main__":
                     btc.pop(k, None)
                 tc.update(btc)
 
-            hyperopt = HyperOptSearch(metric="accuracy", mode="max")
+            # TODO: This is just for MoE
+            current_best_params = [{
+                "moe_lr": 0.00002,
+                "gatedropout": 0.7,
+                "gatehiddenunits1": 4,
+                "gatefilters1": 4,
+                "gatefilters2": 2,
+                "gate_weight_decay": 0.0003
+            }]
+
+            hyperopt = HyperOptSearch(
+                metric="accuracy", mode="max",
+                points_to_evaluate=current_best_params)
+
             result = tune.run(
                 train,
-                resources_per_trial={"cpu": 2, "gpu": 0.25},
+                resources_per_trial={"cpu": 2, "gpu": 0.3},
                 search_alg=hyperopt,
                 config=tc,
                 num_samples=args.num_samples,
