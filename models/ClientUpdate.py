@@ -84,10 +84,10 @@ class ClientUpdate(object):
         lr0 = self.lr_decay(0, self.lr, self.lr / 100.0)
 
         optimizer = torch.optim.SGD(net.parameters(), lr=self.lr,
-                                     weight_decay=weight_decay)
+                                    weight_decay=weight_decay)
 
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
-                    lr_lambda=lambda step: self.lr_decay(step, self.lr, self.lr / 100.0) / lr0)
+                                                      lr_lambda=lambda step: self.lr_decay(step, self.lr, self.lr / 100.0) / lr0)
 
         epoch_loss = np.inf
 
@@ -100,13 +100,18 @@ class ClientUpdate(object):
                     self.args.device), labels.to(self.args.device)
                 net.zero_grad()
                 _, log_probs = net(images)
+
                 #log_probs = torch.log(log_probs)
                 loss = self.loss_func(log_probs, labels)
+
                 loss.backward()
                 optimizer.step()
-                scheduler.step()
+
                 batch_loss.append(loss.item())
+
+            scheduler.step()
             epoch_loss = sum(batch_loss) / len(batch_loss)
+
             if self.writer:
                 self.writer.add_scalar(
                     'fl training loss', epoch_loss, epoch + offset)
@@ -122,13 +127,14 @@ class ClientUpdate(object):
 
         return net.state_dict(), epoch_loss
 
+
     def train_finetune(self, net, n_epochs, learning_rate, weight_decay=0):
         net.train()
         # train and update
-        lr0 = self.lr_decay(0, self.lr, self.lr / 100.0)
+        lr0 = self.lr_decay(0, learning_rate, learning_rate / 100.0)
 
         # TODO add parameter
-        optimizer = torch.optim.Adam(
+        optimizer = torch.optim.AdamW(
             net.parameters(), lr=learning_rate, weight_decay=weight_decay)
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
                                                       lr_lambda=lambda step: self.lr_decay(step, learning_rate, learning_rate / 100.0) / lr0)
@@ -153,14 +159,18 @@ class ClientUpdate(object):
                     self.args.device), labels.to(self.args.device)
                 net.zero_grad()
                 _, log_probs = net(images)
+
                 #log_probs = torch.log(log_probs)
                 loss = self.loss_func(log_probs, labels)
+
                 loss.backward()
                 optimizer.step()
-                scheduler.step()
+
                 batch_loss.append(loss.item())
                 _, predicted = torch.max(log_probs.data, 1)
                 correct += (predicted == labels).sum().item()
+
+            scheduler.step()
             train_accuracy = 100.00 * correct / len(self.ldr_train.dataset)
             epoch_train_accuracy.append(train_accuracy)
             epoch_loss.append(sum(batch_loss) / len(batch_loss))
@@ -176,6 +186,8 @@ class ClientUpdate(object):
                 #print(iter, val_loss)
 
                 if self.writer:
+                    self.writer.add_scalar(
+                        'local learning rate', scheduler.get_last_lr()[0], epoch)
                     self.writer.add_scalar(
                         'local validation loss', val_loss, epoch)
                     self.writer.add_scalar(
@@ -208,9 +220,9 @@ class ClientUpdate(object):
         gate.train()
 
         if(train_gate_only):
-            optimizer = torch.optim.Adam(gate.parameters(), lr=learning_rate)
+            optimizer = torch.optim.AdamW(gate.parameters(), lr=learning_rate)
         else:
-            optimizer = torch.optim.Adam(list(net_local.parameters(
+            optimizer = torch.optim.AdamW(list(net_local.parameters(
             )) + list(gate.parameters()) + list(net_global.parameters()), lr=learning_rate)
 
         patience = 10
@@ -343,6 +355,7 @@ class ClientUpdate(object):
 
     #     return gate_best, epoch_loss[-1], val_acc_best, gate_values_best
 
+
     def train_3(self, nets, gate, train_gate_only,
                 n_epochs, early_stop, learning_rate, weight_decay=0):
 
@@ -355,17 +368,17 @@ class ClientUpdate(object):
         if not train_gate_only:
             params += sum([list(net.parameters()) for net in nets], [])
 
-        #lr0 = self.lr_decay(0, self.lr, self.lr / 100.0)
-        optimizer = torch.optim.Adam(
+        #lr0 = self.lr_decay(0, learning_rate, learning_rate / 100.0)
+        optimizer = torch.optim.AdamW(
             params, lr=learning_rate, weight_decay=weight_decay)
-        #scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
+        # scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
         #                                              lr_lambda=lambda step: self.lr_decay(step, learning_rate, learning_rate / 100.0) / lr0)
 
-        patience = 10
+        patience = 20
         #epoch_loss = []
 
         gate_best = gate.state_dict()
-        val_acc_best = -np.inf
+        val_acc_best = 0
         val_loss_best = np.inf
         counter = 0
         gate_values_best = None
@@ -379,6 +392,7 @@ class ClientUpdate(object):
             batch_loss = []
             batch_accuracy = []
             correct = 0
+
             for _, (images, labels) in enumerate(self.ldr_train):
                 images, labels = images.to(
                     self.args.device), labels.to(self.args.device)
@@ -392,23 +406,22 @@ class ClientUpdate(object):
 
                 if len(nets) == 2:
 
-                    _, global_probs = nets[0](images)
-                    _, local_probs = nets[1](images)
+                    _, global_probs = nets[0](images.float())
+                    _, local_probs = nets[1](images.float())
 
-                    log_probs = gate_weight * local_probs + \
-                        (1 - gate_weight) * global_probs
+                    log_probs = gate_weight *  torch.exp(local_probs) + \
+                        (1 - gate_weight) *  torch.exp(global_probs)
 
                 else:
-
                     log_probs = 0
 
                     for i in range(len(nets)):
                         # print(gate_weight.shape)
                         # print(gate_weight[:,i].shape)
-                        _, net_probs = nets[i](images)
+                        _, net_probs = nets[i](images.float())
                         # print(net_probs.shape)
                         gate_weight_i = gate_weight[:, i].reshape(-1, 1)
-                        log_probs += gate_weight_i * net_probs
+                        log_probs += gate_weight_i * torch.exp(net_probs)
                         # print(log_probs.shape)
 
                 _, predicted = torch.max(log_probs.data, 1)
@@ -416,17 +429,19 @@ class ClientUpdate(object):
                 train_accuracy = 100.00 * correct / len(self.ldr_train.dataset)
                 batch_accuracy.append(train_accuracy)
 
-                #log_probs = torch.log(log_probs)
-                loss = self.loss_func(log_probs, labels)
+                loss = self.loss_func(torch.log(log_probs), labels)
                 loss.backward()
                 optimizer.step()
-                #scheduler.step()
+
                 batch_loss.append(loss.item())
 
+            # scheduler.step()
             this_epoch_loss = np.mean(batch_loss)
             this_epoch_accuracy = np.mean(batch_accuracy)
 
             if self.writer:
+                # self.writer.add_scalar(
+                #         'moe learning rate', scheduler.get_last_lr()[0], epoch)
                 self.writer.add_scalar(
                     'moe training loss', this_epoch_loss, epoch)
                 self.writer.add_scalar(
@@ -434,8 +449,9 @@ class ClientUpdate(object):
             #epoch_loss.append(sum(batch_loss) / len(batch_loss))
 
             if(early_stop):
-                if(epoch % 5 == 0):
-                    val_acc, val_loss, gate_values = self.validate_3(nets, gate)
+                if(epoch % 2 == 0):
+                    val_acc, val_loss, gate_values = self.validate_3(
+                        nets, gate)
 
                     if self.writer:
                         self.writer.add_scalar(
@@ -490,8 +506,6 @@ class ClientUpdate(object):
 
             loss /= len(dataset.dataset)
             accuracy = 100.00 * correct / len(dataset.dataset)
-            # print('\nVal set: Average loss: {:.4f} \nAccuracy: {:.2f}%\n'.format(
-            #    val_loss, accuracy))
 
         return accuracy.item(), loss
 
@@ -519,7 +533,8 @@ class ClientUpdate(object):
 
                 log_probs = gate_weight * local_probs + \
                     (1 - gate_weight) * global_probs
-                #log_probs = torch.log(log_probs)
+
+                log_probs = torch.log(log_probs)
                 val_loss += self.loss_func(log_probs, target).item()
                 y_pred = log_probs.data.max(1, keepdim=True)[1]
                 correct += y_pred.eq(target.data.view_as(y_pred)
@@ -538,32 +553,36 @@ class ClientUpdate(object):
             gate.eval()
             val_loss = 0
             correct = 0
-            #gate_values = np.array([])
-            #label_values = np.array([])
+
             for _, (data, target) in enumerate(self.ldr_val):
                 data, target = data.to(
                     self.args.device), target.to(self.args.device)
+
                 gate_weight = gate(data)
 
                 if len(nets) == 2:
 
-                    _, global_probs = nets[0](data)
-                    _, local_probs = nets[1](data)
+                    _, global_probs = nets[0](data.float())
+                    _, local_probs = nets[1](data.float())
 
-                    log_probs = gate_weight * local_probs + \
-                        (1 - gate_weight) * global_probs
+                    log_probs = gate_weight * torch.exp(local_probs) + \
+                        (1 - gate_weight) * torch.exp(global_probs)
 
                 else:
 
                     log_probs = 0
                     for i, net in enumerate(nets):
-                        _, net_probs = net(data)
-                        log_probs += gate_weight[:, i] * net_probs
+                        _, net_probs = net(data.float())
+                        log_probs += gate_weight[:, i] * torch.exp(net_probs)
 
                 # gate_values = np.append(gate_values,gate_weight.item())
                 # label_values = np.append(label_values,target.item())
 
-                val_loss += self.loss_func(log_probs, target).item()
+                val_loss += self.loss_func(torch.log(log_probs), target).item()
+
+                #_, y_pred = torch.max(log_probs.data, 1)
+                #correct += (y_pred == target).sum().item()
+
                 y_pred = log_probs.data.max(1, keepdim=True)[1]
                 correct += y_pred.eq(target.data.view_as(y_pred)
                                      ).long().cpu().sum()
