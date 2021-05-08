@@ -85,16 +85,32 @@ class CNNLeafFEMNIST(nn.Module):
     TODO: Implicit dimension choice for log_softmax has been deprecated
     """
 
-    def __init__(self, args):
+    def __init__(self, args, model="local"):
 
         super().__init__()
 
-        self.conv1 = nn.Conv2d(1, 32, 5)
+        if model == "local":
+            self.filters1 = args.localfilters1
+            self.filters2 = args.localfilters2
+            self.hiddenunits = args.localhiddenunits1
+            self.dropout = args.localdropout
+        elif model == "fl":
+            self.filters1 = args.flfilters1
+            self.filters2 = args.flfilters2
+            self.hiddenunits = args.flhiddenunits1
+            self.dropout = args.fldropout
+        else:
+            self.filters1 = 32
+            self.filters2 = 64
+            self.hiddenunits = 512
+            self.dropout = 0.5
+
+        self.conv1 = nn.Conv2d(1, self.filters1, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(32, 64, 5)
-        self.fc1 = nn.Linear(64 * 4 * 4, 2048)
-        self.dropout = nn.Dropout()
-        self.fc2 = nn.Linear(2048, args.num_classes)
+        self.conv2 = nn.Conv2d(self.filters1, self.filters2, 5)
+        self.fc1 = nn.Linear(self.filters2 * 4 * 4, self.hiddenunits)
+        self.dropout = nn.Dropout(p = self.dropout)
+        self.fc2 = nn.Linear(self.hiddenunits, args.num_classes)
         self.activation = nn.LogSoftmax()
 
     def forward(self, x):
@@ -104,7 +120,7 @@ class CNNLeafFEMNIST(nn.Module):
 
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 64 * 4 * 4)
+        x = x.view(-1, self.filters2 * 4 * 4)
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
         out1 = F.relu(self.fc2(x))
@@ -113,6 +129,13 @@ class CNNLeafFEMNIST(nn.Module):
 
 
 class GateCNNLeaf(nn.Module):
+
+    def num_flat_features(self, x):
+        size = x.size()[1:]
+        num = 1
+        for i in size:
+            num *= i
+        return num
 
     def __init__(self, args, nomodels=None):
         super().__init__()
@@ -126,10 +149,17 @@ class GateCNNLeaf(nn.Module):
         if nomodels:
             self.nomodels = nomodels
 
-        self.conv1 = nn.Conv2d(args.channels, self.gatefilters1, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(self.gatefilters1, self.gatefilters2, 5)
-        self.fc1 = nn.Linear(self.gatefilters2 * 5 * 5, self.gatehiddenunits1)
+
+        if self.gatefilters2 > 0:
+            self.conv1 = nn.Conv2d(args.channels, self.gatefilters1, 5)
+            self.conv2_drop = nn.Dropout2d(p=self.gatedropout)
+            self.conv2 = nn.Conv2d(self.gatefilters1, self.gatefilters2, 5)
+            self.fc1 = nn.Linear(self.gatefilters2 * 5 * 5, self.gatehiddenunits1)
+        else:
+            self.conv1 = nn.Conv2d(args.channels, self.gatefilters1, 5)
+            self.fc1 = nn.Linear(self.gatefilters1 * 14 * 14, self.gatehiddenunits1)
+
         self.dropout = nn.Dropout(p=self.gatedropout)
 
         if self.nomodels <= 2:
@@ -142,8 +172,11 @@ class GateCNNLeaf(nn.Module):
     def forward(self, x):
 
         x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, self.gatefilters2 * 5 * 5)
+
+        if self.gatefilters2 > 0:
+            x = self.pool(F.relu(self.conv2_drop(self.conv2(x))))
+
+        x = x.view(-1, self.num_flat_features(x)) # self.gatefilters2 * 5 * 5
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
         x = F.relu(self.fc2(x))
@@ -152,6 +185,13 @@ class GateCNNLeaf(nn.Module):
         return x
 
 class GateCNNFEMNIST(nn.Module):
+
+    def num_flat_features(self, x):
+        size = x.size()[1:]
+        num = 1
+        for i in size:
+            num *= i
+        return num
 
     def __init__(self, args, nomodels=None):
         super().__init__()
@@ -165,11 +205,18 @@ class GateCNNFEMNIST(nn.Module):
         if nomodels:
             self.nomodels = nomodels
 
-        self.conv1 = nn.Conv2d(1, self.gatefilters1, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(self.gatefilters1, self.gatefilters2, 5)
-        self.fc1 = nn.Linear(self.gatefilters2 * 4 * 4, self.gatehiddenunits1)
-        self.dropout = nn.Dropout()
+
+        if self.gatefilters2 > 0:
+            self.conv1 = nn.Conv2d(args.channels, self.gatefilters1, 5)
+            self.conv2_drop = nn.Dropout2d(p=self.gatedropout)
+            self.conv2 = nn.Conv2d(self.gatefilters1, self.gatefilters2, 5)
+            self.fc1 = nn.Linear(self.gatefilters2 * 4 * 4, self.gatehiddenunits1)
+        else:
+            self.conv1 = nn.Conv2d(args.channels, self.gatefilters1, 5)
+            self.fc1 = nn.Linear(self.gatefilters1 * 12 * 12, self.gatehiddenunits1)
+
+        self.dropout = nn.Dropout(p=self.gatedropout)
 
         if self.nomodels <= 2:
             self.fc2 = nn.Linear(self.gatehiddenunits1, 1)
@@ -181,12 +228,16 @@ class GateCNNFEMNIST(nn.Module):
     def forward(self, x):
 
         x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, self.gatefilters2 * 4 * 4)
+
+        if self.gatefilters2 > 0:
+            x = self.pool(F.relu(self.conv2_drop(self.conv2(x))))
+
+        x = x.view(-1, self.num_flat_features(x)) # self.gatefilters2 * 5 * 5
         x = F.relu(self.fc1(x))
         x = self.dropout(x)
         x = F.relu(self.fc2(x))
         x = self.activation(x)
+
         return x
 
 class CNNIFCA(nn.Module):
