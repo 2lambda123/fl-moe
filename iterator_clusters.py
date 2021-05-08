@@ -61,14 +61,14 @@ if __name__ == "__main__":
 
         basename = os.path.splitext(os.path.basename(filename))[
             0].replace("config_", "").replace("_", "-")
-        job_name = f"{gen_name}-{basename}-"
 
         raw_clusters = np.arange(args.min_clusters, args.max_clusters + 1)
         if args.j is not None:
             raw_clusters = np.array(args.j)
 
+        # eps_decay_b
         for run in range(args.runs):
-            for strategy in ["none","eps"]:
+            for strategy in ["none", "eps"]:
                 for clusters in np.array_split(raw_clusters, args.splits):
 
                     if len(clusters) == 1:
@@ -83,7 +83,7 @@ if __name__ == "__main__":
                                "--explore_strategy", strategy,
                                "--filename", filename]
 
-                    job_name_r = job_name + str(run) + "-"
+                    job_name_r = f"{gen_name}-{basename}-{strategy}-{run}-"
                     mylogger.debug(job_name_r + " - " + " ".join(command))
 
                     # Allow dry-runs
