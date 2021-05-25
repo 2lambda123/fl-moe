@@ -35,6 +35,7 @@ def args_parser():
     parser.add_argument('--gatehiddenunits2', type=int, default=512, help="Number of hidden units in fc layer of gate")
     parser.add_argument('--gatefilters1', type=int, default=32, help="Number of hidden units in fc layer of gate")
     parser.add_argument('--gatefilters2', type=int, default=64, help="Number of hidden units in fc layer of gate")
+    parser.add_argument('--gatefiltersize', type=int, default=5, help="Filter size in fc layer of gate")
     parser.add_argument('--gate_weight_decay', type=float, default=1e-4, help="MoE weight decay")
     parser.add_argument('--gatedropout', type=float, default=0.5, help="MoE dropout")
 
