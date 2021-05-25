@@ -35,4 +35,5 @@ def get_available_gpus(threshold=1400):
 
     data = get_gpu_info()
     data['memory.free'] = data['memory.free'].str.extract('(\d+)').astype(int)
+    data = data.sort_values("memory.free", ascending=False)
     return data[data["memory.free"] > threshold].index.values.tolist()
