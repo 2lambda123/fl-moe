@@ -7,10 +7,9 @@ from utils.gpuutils import get_available_gpus
 import numpy as np
 import ray
 from ray import tune
-
-from random import randint
 from time import sleep
 from ray.tune.suggest.hyperopt import HyperOptSearch
+import secrets
 
 
 def args_parser():
@@ -41,7 +40,7 @@ def train(config):
     # Avoid starting two experiments to close...
 
     logger = get_logger("tuner_train")
-    sleeptime = randint(10, 60)
+    sleeptime = secrets.SystemRandom().randint(10, 60)
     logger.info(f"Sleeping for {sleeptime} seconds.")
     sleep(sleeptime)
 
