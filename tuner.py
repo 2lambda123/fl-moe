@@ -13,6 +13,19 @@ import secrets
 
 
 def args_parser():
+    """This function parses command line arguments and returns the arguments as a Namespace object.
+    Parameters:
+        - filename (str): Name of the configuration file.
+        - dry-run (bool): Flag to indicate if the program should be executed or not.
+        - num_samples (int): Number of samples to be used.
+    Returns:
+        - Namespace: Object containing the parsed arguments.
+    Processing Logic:
+        - Uses the argparse module to parse arguments.
+        - Stores the filename as a list.
+        - Sets the default value for dry-run to False.
+        - Sets the default value for num_samples to 10."""
+    
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -26,6 +39,20 @@ def args_parser():
 
 
 def get_fields(d):
+    """Get all fields from a nested dictionary.
+    Parameters:
+        - d (dict): A nested dictionary.
+    Returns:
+        - dict: A dictionary containing all fields from the nested dictionary.
+    Processing Logic:
+        - Recursively iterate through the nested dictionary.
+        - If a value is a dictionary, call the function again.
+        - Add key-value pair to fields dictionary.
+        - Return the fields dictionary.
+    Example:
+        d = {'a': 1, 'b': {'c': 2, 'd': {'e': 3}}}
+        get_fields(d)  # {'a': 1, 'c': 2, 'e': 3}"""
+    
     fields = {}
     for key, value in d.items():
         if isinstance(value, dict):
@@ -36,6 +63,19 @@ def get_fields(d):
 
 
 def train(config):
+    """Function:
+    def train(config):
+        Trains a federated learning model based on the provided configuration.
+        Parameters:
+            - config (dict): A dictionary containing the configuration for the experiment.
+        Returns:
+            - float: The average accuracy of the trained model.
+        Processing Logic:
+            - Sets up the experiment based on the provided configuration.
+            - Copies the experiment parameters for later reference.
+            - Trains the model and reports the average accuracy.
+        # Code for training the model goes here"""
+    
 
     # Avoid starting two experiments to close...
 

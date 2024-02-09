@@ -13,6 +13,27 @@ import secrets
 
 
 def args_parser():
+    """Function to parse command line arguments and return the parsed arguments.
+    Parameters:
+        - None
+    Returns:
+        - args (argparse.Namespace): Parsed arguments from the command line.
+    Processing Logic:
+        - Parses command line arguments.
+        - Returns the parsed arguments.
+        - Can handle multiple filenames.
+        - Can handle a dry run flag.
+        - Can handle the number of samples to use.
+    Example:
+        args = args_parser()
+        print(args.filename)
+        print(args.dry_run)
+        print(args.num_samples)
+        $ python example.py --filename config1.yaml --filename config2.yaml --dry-run --num_samples 20
+        ['config1.yaml', 'config2.yaml']
+        True
+        20"""
+    
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -26,6 +47,16 @@ def args_parser():
 
 
 def get_fields(d):
+    """Get all fields from a nested dictionary.
+    Parameters:
+        - d (dict): Dictionary to retrieve fields from.
+    Returns:
+        - dict: Dictionary containing all fields from the input dictionary.
+    Processing Logic:
+        - Recursively checks for nested dictionaries.
+        - Updates fields dictionary with new fields.
+        - Returns final fields dictionary."""
+    
     fields = {}
     for key, value in d.items():
         if isinstance(value, dict):
@@ -36,6 +67,19 @@ def get_fields(d):
 
 
 def train(config):
+    """Train a federated learning model using the provided configuration.
+    Parameters:
+        - config (dict): A dictionary containing the configuration for the federated learning model.
+    Returns:
+        - float: The average accuracy of the federated learning model.
+    Processing Logic:
+        - Generate a random sleep time between 10 and 60 seconds.
+        - Read the configuration file and update it with the provided configuration.
+        - Set up the output paths for the model.
+        - Copy the configuration file for later reference.
+        - Run the federated learning model with the updated configuration.
+        - Return the average accuracy of the model."""
+    
 
     # Avoid starting two experiments to close...
 
